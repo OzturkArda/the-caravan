@@ -7,6 +7,7 @@ import logging
 import re
 import time
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import discord
 from aiohttp import web
@@ -52,7 +53,9 @@ class RSVPButton(
         self.status = status
 
     @classmethod
-    async def from_custom_id(cls, interaction: discord.Interaction, item: discord.ui.Button, match: re.Match[str], /):
+    async def from_custom_id(
+        cls, interaction: discord.Interaction, item: discord.ui.Item[Any], match: re.Match[str], /
+    ) -> RSVPButton:
         return cls(int(match["sid"]), match["status"])
 
     async def callback(self, interaction: discord.Interaction) -> None:
@@ -224,7 +227,7 @@ def register_commands(bot: CaravanBot) -> None:
         minutes = duration or cfg.default_duration_min
         channel_id = cfg.sessions_channel_id or interaction.channel_id
         channel = await bot.channel(channel_id) if channel_id else None
-        if channel is None:
+        if channel_id is None or channel is None:
             await interaction.response.send_message("I can't post in the sessions channel.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=channel_id != interaction.channel_id, thinking=True)

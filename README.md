@@ -17,12 +17,10 @@ Machine names, addresses and tokens live in `~/.config/caravan/` on each machine
 ### 1. Discord bot (once)
 
 1. At https://discord.com/developers/applications create an application, open **Bot**, and copy the token (Reset Token).
-2. Invite it, replacing `APP_ID` with the application ID from **General Information**:
-   `https://discord.com/oauth2/authorize?client_id=APP_ID&scope=bot+applications.commands&permissions=8590019584`
-   (View Channels, Send Messages, Embed Links, Read Message History, Manage Events.)
+2. In Discord, turn on Developer Mode (Settings > Advanced) so you can right-click the server and the sessions channel and **Copy ID**.
 3. On the Mac, put the bot machine's SSH destination in `~/.config/caravan/deploy.env` (template: `deploy/deploy.env.example`).
-4. On the bot machine, fill in `~/.config/caravan/bot.env` (template: `deploy/bot.env.example`): the token, server ID and sessions channel ID.
-5. From this repo on the Mac: `deploy/deploy-bot.sh`. Rerun it after any bot change.
+4. From this repo on the Mac: `deploy/configure-bot.sh`. It asks for the token (hidden), server ID and sessions channel ID, writes them into `~/.config/caravan/bot.env` on the bot machine, prints the invite link (permissions: View Channels, Send Messages, Embed Links, Read Message History, Manage Events), waits while you add the bot, then deploys and starts it. Press Enter at a prompt to keep the current value.
+5. Rerun `deploy/deploy-bot.sh` after any bot change. Other settings are in `~/.config/caravan/bot.env` on the bot machine (template: `deploy/bot.env.example`); rerunning `configure-bot.sh` adds any the template has gained.
 
 ### 2. Sync app (Arda's Mac)
 
