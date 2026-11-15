@@ -40,7 +40,7 @@ The bot's slash commands work in any channel the bot can see. The addon's `/cara
 |---|---|---|
 | [`/session add`](docs/COMMANDS.md#session-add) | Schedule a session with RSVP buttons and a Discord event | Everyone |
 | [`/session list`](docs/COMMANDS.md#session-list) | Upcoming sessions | Everyone |
-| [`/session cancel`](docs/COMMANDS.md#session-cancel) | Cancel a session | Everyone |
+| [`/session cancel`](docs/COMMANDS.md#session-cancel) | Cancel a session you scheduled | Everyone |
 | [`/session suggest`](docs/COMMANDS.md#session-suggest) | Best times from everyone's availability | Everyone |
 | [`/availability add`](docs/COMMANDS.md#availability-add) | Add a weekly window when you can play | Only you |
 | [`/availability clear`](docs/COMMANDS.md#availability-clear) | Remove all your windows | Only you |

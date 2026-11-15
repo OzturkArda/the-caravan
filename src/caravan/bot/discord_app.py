@@ -70,6 +70,11 @@ class RSVPButton(
         await interaction.response.edit_message(embed=embed, view=rsvp_view(session.id))
 
 
+def may_cancel(session: Session, user_id: int, permissions: discord.Permissions) -> bool:
+    """The person who scheduled a session, or anyone who can manage the server, may cancel it."""
+    return user_id == session.created_by or permissions.manage_guild or permissions.administrator
+
+
 def rsvp_view(session_id: int) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     for status in ("going", "late", "out"):
@@ -266,9 +271,20 @@ def register_commands(bot: CaravanBot) -> None:
         lines = [render.session_line(s, store.rsvps(s.id)) for s in sessions]
         await interaction.response.send_message("\n".join(lines))
 
-    @session_group.command(name="cancel", description="Cancel a session")
+    @session_group.command(name="cancel", description="Cancel a session you scheduled")
     @app_commands.describe(session_id="The number shown as Session #N")
     async def session_cancel(interaction: discord.Interaction, session_id: int) -> None:
+        session = store.get_session(session_id)
+        if session is not None and not session.cancelled and not may_cancel(
+            session, interaction.user.id, interaction.permissions
+        ):
+            await interaction.response.send_message(
+                f"Only <@{session.created_by}>, who scheduled session #{session_id}, "
+                "or someone with Manage Server can cancel it.",
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
         if not store.cancel_session(session_id):
             await interaction.response.send_message(f"No active session #{session_id}.", ephemeral=True)
             return

@@ -143,3 +143,67 @@ def test_level_gap_embed_and_config():
     cfg = Config.from_env({"DISCORD_TOKEN": "t", "CARAVAN_API_TOKEN": "a", "SESSIONS_CHANNEL_ID": "9",
                            "ALERTS_CHANNEL_ID": "8", "LEVEL_GAP": "0"})
     assert cfg.level_gap == 0 and cfg.alerts_channel == 8
+
+
+class _FakeResponse:
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, bool]] = []
+
+    async def send_message(self, content: str, *, ephemeral: bool = False, **_: object) -> None:
+        self.sent.append((content, ephemeral))
+
+
+class _FakeInteraction:
+    def __init__(self, user_id: int, permissions: discord.Permissions) -> None:
+        self.user = discord.Object(id=user_id)
+        self.permissions = permissions
+        self.guild = None
+        self.response = _FakeResponse()
+
+
+@pytest.mark.parametrize(
+    ("user_id", "permissions", "allowed"),
+    [
+        (10, discord.Permissions.none(), True),                       # the scheduler
+        (20, discord.Permissions(manage_guild=True), True),           # Manage Server
+        (20, discord.Permissions(administrator=True), True),          # Administrator
+        (20, discord.Permissions.none(), False),                      # anyone else
+        (20, discord.Permissions(manage_events=True), False),         # Manage Events isn't enough
+    ],
+)
+async def test_session_cancel_is_limited_to_scheduler_and_admins(user_id, permissions, allowed):
+    from caravan.bot.db import Store
+    from caravan.bot.discord_app import CaravanBot, may_cancel
+
+    store = Store(":memory:")
+    bot = CaravanBot(Config(discord_token="x", api_token="y"), store)
+    session = store.create_session(guild_id=1, channel_id=2, title="Deadmines", start_ts=1_800_000_000,
+                                   duration_min=120, created_by=10)
+    assert may_cancel(session, user_id, permissions) is allowed
+
+    cancel = bot.tree.get_command("session").get_command("cancel")
+    interaction = _FakeInteraction(user_id, permissions)
+    await cancel.callback(interaction, session.id)
+
+    [(text, ephemeral)] = interaction.response.sent
+    assert store.get_session(session.id).cancelled is allowed
+    if allowed:
+        assert text == f"Cancelled **Deadmines** (#{session.id})." and not ephemeral
+    else:
+        assert text.startswith("Only <@10>, who scheduled session #") and ephemeral
+
+
+async def test_session_cancel_unknown_or_already_cancelled():
+    from caravan.bot.db import Store
+    from caravan.bot.discord_app import CaravanBot
+
+    store = Store(":memory:")
+    bot = CaravanBot(Config(discord_token="x", api_token="y"), store)
+    session = store.create_session(guild_id=1, channel_id=2, title="Deadmines", start_ts=1_800_000_000,
+                                   duration_min=120, created_by=10)
+    store.cancel_session(session.id)
+    cancel = bot.tree.get_command("session").get_command("cancel")
+    for session_id in (session.id, 999):
+        interaction = _FakeInteraction(20, discord.Permissions.none())
+        await cancel.callback(interaction, session_id)
+        assert interaction.response.sent == [(f"No active session #{session_id}.", True)]
