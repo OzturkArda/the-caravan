@@ -1,0 +1,14 @@
+[Unit]
+Description=The Caravan Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=%h/.local/share/caravan
+EnvironmentFile=%h/.config/caravan/bot.env
+ExecStart=%h/projects/the-caravan/.venv/bin/caravan-bot
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=default.target

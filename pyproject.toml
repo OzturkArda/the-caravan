@@ -1,0 +1,38 @@
+[project]
+name = "caravan"
+version = "0.1.0"
+description = "The Caravan: WoW Forever group companion (Discord bot + sync app)"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.14.5",
+    "dateparser>=1.5.0",
+    "discord-py>=2.7.1",
+    "tzdata>=2026.6",
+]
+
+[project.scripts]
+caravan-bot = "caravan.bot.__main__:main"
+caravan-sync = "caravan.sync.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/caravan"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "lupa>=2.8",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
