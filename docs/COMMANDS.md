@@ -85,7 +85,7 @@ Lists sessions that haven't ended yet, soonest first, up to 10. A session under 
 
 ### `/session cancel`
 
-Cancels a session. The card is struck through and loses its buttons, the Discord event is deleted, and no reminders or recap follow. Anyone in the server can cancel any session. There's no undo; schedule it again with `/session add`.
+Cancels a session. The card is struck through and loses its buttons, the Discord event is deleted, and no reminders or recap follow. Only the person who scheduled the session can cancel it, or a member with the **Manage Server** or **Administrator** permission. There's no undo; schedule it again with `/session add`.
 
 **Syntax**
 
@@ -101,7 +101,10 @@ Cancels a session. The card is struck through and loses its buttons, the Discord
 
 **Reply**: everyone, e.g. "Cancelled **Deadmines run** (#12)."
 
-**Errors** (only you): "No active session #12" when there's no such session or it's already cancelled.
+**Errors** (only you):
+
+- "No active session #12" when there's no such session or it's already cancelled.
+- "Only @Brynn, who scheduled session #12, or someone with Manage Server can cancel it." when it isn't yours to cancel.
 
 **Example**
 
