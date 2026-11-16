@@ -45,7 +45,7 @@ Schedules a play session. The bot posts a session card with **In**, **Late** and
 
 - The card's footer shows the session number (`Session #12`), which `/session cancel` asks for.
 - Anyone can click a button to RSVP or change their answer, and the card's counts update. The buttons keep working after the bot restarts.
-- Before the start, the bot posts reminders (`REMINDER_OFFSETS`, default 60 and 15 minutes before) that mention everyone who is **In** or **Late**. If the bot was offline when reminders fell due, it sends only one when it's back.
+- Before the start, the bot posts reminders (`REMINDER_OFFSETS`, default 60 and 15 minutes before) that mention everyone who is **In** or **Late**, e.g. "⏰ **Deadmines run** starts at 19:30 (in 15 minutes)" with a link to the card. Discord shows both times in each reader's local time. If the bot was offline when reminders fell due, it sends only one when it's back.
 - The Discord event needs the bot's **Manage Events** permission. Without it, the session is still scheduled, just without an event.
 
 **Examples**

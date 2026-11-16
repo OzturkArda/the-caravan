@@ -57,8 +57,10 @@ def session_line(session: Session, rsvps: dict[str, list[Attendee]]) -> str:
 
 def reminder_text(session: Session, rsvps: dict[str, list[Attendee]], jump_url: str | None) -> str:
     mentions = " ".join(f"<@{a.user_id}>" for a in rsvps["going"] + rsvps["late"])
-    link = f" ({jump_url})" if jump_url else ""
-    text = f"⏰ **{session.title}** starts {ts(session.start_ts, 'R')}{link}."
+    # The clock time stays right once the start has passed; the relative one
+    # alone would then read "starts 5 minutes ago".
+    text = f"⏰ **{session.title}** starts at {ts(session.start_ts, 't')} ({ts(session.start_ts, 'R')})"
+    text = f"{text} · {jump_url}" if jump_url else f"{text}."
     return f"{text} {mentions}" if mentions else f"{text} Nobody has RSVP'd yet."
 
 
