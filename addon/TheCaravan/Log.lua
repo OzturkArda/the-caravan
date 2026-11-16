@@ -236,4 +236,7 @@ function Caravan:OnLogout()
 	if self.currentRun then
 		self.currentRun.te = GetServerTime()
 	end
+	-- The game writes the saved data now (logout, /reload or exit); where the
+	-- sync app runs, it uploads it within seconds (see Rsvp.lua).
+	self.db.savedAt = GetServerTime()
 end
