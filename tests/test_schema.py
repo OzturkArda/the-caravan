@@ -43,3 +43,6 @@ def test_schedule_signature_ignores_generation_time():
     assert schedule_signature(a) == schedule_signature(b)
     assert schedule_signature(a) != schedule_signature({"sessions": []})
     assert schedule_signature(None) == "[]"
+    relayed = {**a, "from": "Brakka-Ironvale"}
+    assert schedule_signature(relayed) == schedule_signature(a)
+    assert schedule_signature({**a, "reminders": [30]}) != schedule_signature({**a, "reminders": [60, 15]})

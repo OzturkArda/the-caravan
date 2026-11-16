@@ -341,8 +341,12 @@ class Store:
 
     # schedule export ---------------------------------------------------------
 
-    def schedule_export(self, now_ts: int) -> dict[str, Any]:
-        """The upcoming schedule in the format the sync app writes for the addon."""
+    def schedule_export(self, now_ts: int, reminders: tuple[int, ...] = (60, 15)) -> dict[str, Any]:
+        """The upcoming schedule in the format the sync app writes for the addon.
+
+        `reminders` (minutes before the start) lets the addon remind at the
+        same times as the bot.
+        """
         sessions = []
         for s in self.upcoming_sessions(now_ts, limit=20):
             rsvps = self.rsvps(s.id)
@@ -353,7 +357,7 @@ class Store:
                 "duration": s.duration_min,
                 **{status: [a.display_name for a in rsvps[status]] for status in rsvps},
             })
-        return {"version": SCHEMA_VERSION, "generated_at": now_ts, "sessions": sessions}
+        return {"version": SCHEMA_VERSION, "generated_at": now_ts, "reminders": list(reminders), "sessions": sessions}
 
     # crafting orders ---------------------------------------------------------
 

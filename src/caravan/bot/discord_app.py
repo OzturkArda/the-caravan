@@ -132,7 +132,10 @@ class CaravanBot(discord.Client):
             await self.tree.sync()
         self.reminder_loop.start()
         self.recap_loop.start()
-        app = create_app(self.store, self.config.api_token, on_snapshot=self.feed.on_snapshot)
+        app = create_app(
+            self.store, self.config.api_token, on_snapshot=self.feed.on_snapshot,
+            reminders=self.config.reminder_offsets,
+        )
         self._runner = web.AppRunner(app)
         await self._runner.setup()
         await web.TCPSite(self._runner, self.config.api_host, self.config.api_port).start()

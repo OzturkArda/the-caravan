@@ -12,5 +12,6 @@ Collect.lua
 Log.lua
 Recipes.lua
 Comm.lua
+Schedule.lua
 UI.lua
 Minimap.lua
