@@ -529,10 +529,12 @@ function Caravan:FillSessions()
 		row.cells[3]:SetText(#coming > 0 and table.concat(coming, ", ") or "-")
 		fitText(row.cells[4], #out > 0 and table.concat(out, ", ") or "-", tostring(#out))
 	end)
-	f.empty:SetText(#sessions == 0 and "No upcoming sessions.\nSessions from Discord appear here after the sync app updates\nyour saved data while the game is closed." or "")
-	local schedule = TheCaravanSchedule
-	if type(schedule) == "table" and schedule.generated_at then
-		f.footer:SetText("From Discord, synced " .. date("%a %d %b %H:%M", schedule.generated_at) .. ". Schedule with /session add in Discord.")
+	f.empty:SetText(#sessions == 0 and "No upcoming sessions.\nSessions from Discord come in through the sync app,\nor from a friend's addon when you group up." or "")
+	local schedule = self:Schedule()
+	if schedule and schedule.generated_at then
+		local via = type(schedule.from) == "string" and (" via " .. (schedule.from:match("^[^-]+") or schedule.from)) or ""
+		f.footer:SetText(string.format("From Discord%s, synced %s. Schedule with /session add in Discord.",
+			via, date("%a %d %b %H:%M", schedule.generated_at)))
 	else
 		f.footer:SetText("Schedule sessions in Discord with /session add.")
 	end
