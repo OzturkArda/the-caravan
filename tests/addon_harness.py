@@ -53,8 +53,8 @@ class Client:
         self.W.player.name = name
         self.W.realm = realm
         self.full_name = f"{name}-{realm}"
-        if db is not None:
-            self.g.TheCaravanDB = db
+        if db is not None:  # a Lua table from this runtime, or plain Python data (e.g. another client's, via to_py)
+            self.g.TheCaravanDB = self.lua.table_from(db, recursive=True) if isinstance(db, dict) else db
         if schedule is not None:
             self.g.TheCaravanSchedule = self.lua.table_from(schedule, recursive=True)
         ns = self.lua.table()
