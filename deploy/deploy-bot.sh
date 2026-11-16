@@ -4,8 +4,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . deploy/host.sh
+# Keep these in step with .gitignore: .claude holds Claude Code worktrees (whole
+# repo copies), and *.db / *.env are local data and settings.
 rsync -a --delete --exclude .venv --exclude .git --exclude dist --exclude addon \
-  --exclude __pycache__ --exclude .pytest_cache ./ "$HOST:projects/the-caravan/"
+  --exclude __pycache__ --exclude .pytest_cache --exclude .claude --exclude '*.db' \
+  --exclude '*.env' ./ "$HOST:projects/the-caravan/"
 ssh "$HOST" bash -s <<'REMOTE'
 set -euo pipefail
 cd ~/projects/the-caravan
