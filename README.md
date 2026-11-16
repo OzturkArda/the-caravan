@@ -4,11 +4,11 @@ A companion for our WoW Forever group: plan sessions in Discord, see each other'
 
 | Part | Runs on | Does |
 |---|---|---|
-| Discord bot (`src/caravan/bot`) | A Linux machine on the home network (systemd user service) | Sessions with RSVP buttons, native Discord events, reminders, availability and time suggestions; game data: `/group`, `/dungeons`, `/craft`, `/order`, level-gap alerts, session recaps; HTTP API for the sync app |
-| Addon (`addon/TheCaravan`) | Everyone's WoW | Shares level, XP, zone, professions, known recipes, gear, and recent level-ups, notable loot and dungeon runs with the group; shows upcoming sessions |
-| Sync app (`src/caravan/sync`) | Arda's Mac | Uploads the addon's saved data to the bot; writes the schedule into it while WoW is closed |
+| Discord bot (`src/caravan/bot`) | A Linux machine on the home network (systemd user service) | Sessions with RSVP buttons, native Discord events, reminders, availability and time suggestions; game data: `/group`, `/dungeons`, `/craft`, `/order`, level-gap alerts, session recaps; `/character` links for in-game RSVPs; HTTP API for the sync app |
+| Addon (`addon/TheCaravan`) | Everyone's WoW | Shares level, XP, zone, professions, known recipes, gear, and recent level-ups, notable loot and dungeon runs with the group; shows upcoming sessions, reminds before them and takes In / Late / Out; passes the session list and RSVPs on to the group |
+| Sync app (`src/caravan/sync`) | Arda's Mac | Uploads the addon's saved data (with in-game RSVPs) to the bot; writes the schedule into it while WoW is closed |
 
-Addons can't reach the internet, so game data travels through the addon's SavedVariables file (`TheCaravan.lua`). The game writes that file on logout, `/reload` and exit, so Discord gets snapshots, not live data. Everyone's addon shares its data in the party, so Arda's file holds the whole group and only Arda runs the sync app.
+Addons can't reach the internet, so game data travels through the addon's SavedVariables file (`TheCaravan.lua`). The game writes that file on logout, `/reload` and exit, so Discord gets snapshots, not live data. Everyone's addon shares its data in the party, so Arda's file holds the whole group and only Arda runs the sync app. The session list goes the other way: the sync app writes it into Arda's file, and Arda's addon passes it on to the group.
 
 ## Setup
 
@@ -54,6 +54,9 @@ The bot's slash commands work in any channel the bot can see. The addon's `/cara
 | [`/order list`](docs/COMMANDS.md#order-list) | Open crafting orders | Everyone |
 | [`/order done`](docs/COMMANDS.md#order-done) | Mark an order crafted | Everyone |
 | [`/order cancel`](docs/COMMANDS.md#order-cancel) | Withdraw your order | Everyone |
+| [`/character link`](docs/COMMANDS.md#character-link) | Link a WoW character to you, so its in-game RSVPs count | Only you |
+| [`/character unlink`](docs/COMMANDS.md#character-unlink) | Unlink a character | Only you |
+| [`/character list`](docs/COMMANDS.md#character-list) | Who has linked which characters | Only you |
 | [`/caravan`](docs/COMMANDS.md#caravan) | In game: open or close the window | Your chat |
 | [`/caravan add`](docs/COMMANDS.md#caravan-add) | In game: add a player to your list | Your chat |
 | [`/caravan addparty`](docs/COMMANDS.md#caravan-addparty) | In game: add everyone in your group | Your chat |
@@ -61,6 +64,16 @@ The bot's slash commands work in any channel the bot can see. The addon's `/cara
 | [`/caravan list`](docs/COMMANDS.md#caravan-list) | In game: show your list | Your chat |
 | [`/caravan sync`](docs/COMMANDS.md#caravan-sync) | In game: share your data with the group now | Your chat |
 | [`/caravan minimap`](docs/COMMANDS.md#caravan-minimap) | In game: show or hide the minimap button | Your chat |
+| [`/caravan reminders`](docs/COMMANDS.md#caravan-reminders) | In game: turn session reminders off or on | Your chat |
+
+## In game
+
+`/caravan` or the minimap button opens a window you can move and resize, with two tabs:
+
+- **Group**: everyone's level and XP, zone, professions, item level and last update; hover for gear and skills.
+- **Sessions**: upcoming sessions with who's coming, and **In** / **Late** / **Out** buttons for your answer. A click reaches Discord at the sync app player's next `/reload` or logout, once you've been grouped with them, and counts for characters [linked](docs/COMMANDS.md#character-link) with `/character link`.
+
+The addon also announces the next session at login and reminds you 60 and 15 minutes before it (chat line, banner and sound). Friends without the sync app get the session list from the group. Details: [The Sessions tab](docs/COMMANDS.md#the-sessions-tab), [`/caravan reminders`](docs/COMMANDS.md#caravan-reminders), and [Sessions in game](docs/GAME-DATA.md#sessions-in-game-and-rsvps-back-to-discord).
 
 ## Game-data features
 
@@ -79,9 +92,10 @@ How the data travels, what the addon records, and the rules behind alerts and re
 ### What each player needs to do
 
 - Install the addon and run `/caravan addparty` once while grouped (see [Setup](#3-addon)).
+- In Discord, link each character you play: `/character link name:<character>`. Then **In** / **Late** / **Out** in the game count as your RSVP.
 - **Open each of your profession windows once**, and again after learning new recipes, so `/craft` and `/order` know what you can make.
-- Group with Arda during sessions, so your data reaches Arda's addon.
-- Arda: log out or `/reload` after a session, so the snapshot, and with it the recap, reaches Discord.
+- Group with Arda during sessions, so your data and RSVPs reach Arda's addon and the session list reaches yours.
+- Arda: log out or `/reload` after a session, so the snapshot, and with it the recap and in-game RSVPs, reaches Discord.
 
 ## Development
 
@@ -90,7 +104,7 @@ uv sync
 uv run pytest
 ```
 
-`tests/test_addon.py` runs the real addon and Ace3 libraries in Lua 5.1 against a fake WoW client (`tests/wow_stub.lua`), including two clients exchanging data. Behaviour in the live client still needs an in-game check.
+The `tests/test_addon*.py` files run the real addon and Ace3 libraries in Lua 5.1 against a fake WoW client (`tests/wow_stub.lua`), including several clients exchanging data. They cover the window layout, reminders, passing on the schedule and in-game RSVPs. Behaviour in the live client still needs an in-game check.
 
 ## Forever platform notes
 
