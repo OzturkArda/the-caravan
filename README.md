@@ -29,7 +29,8 @@ Machine names, addresses and tokens live in `~/.config/caravan/` on each machine
 ### 3. Addon
 
 - Arda: `deploy/link-addon.sh` links the addon into `/Applications/World of Warcraft/_forever_/Interface/AddOns`.
-- Friends: `deploy/package-addon.sh` builds `dist/TheCaravan-<version>.zip`; unzip it into `World of Warcraft/_forever_/Interface/AddOns`.
+- Friends: download `TheCaravan.zip` from the [latest release](https://github.com/OzturkArda/the-caravan/releases/latest) and unzip it into `World of Warcraft/_forever_/Interface/AddOns`.
+- New version: bump `## Version:` in `addon/TheCaravan/TheCaravan.toc`, merge, then run `deploy/release-addon.sh [notes.md]` on master (`--dry-run` first to check). It publishes `addon-v<version>` with `TheCaravan.zip`, the name the download link relies on, and `TheCaravan-<version>.zip`. `deploy/package-addon.sh` still builds a local zip in `dist/`.
 - In game, group up and run `/caravan addparty` once. Only players on your list are accepted.
 
 ## Commands
