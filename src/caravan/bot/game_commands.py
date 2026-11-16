@@ -1,4 +1,4 @@
-"""Slash commands that use game data: /dungeons, /craft and /order."""
+"""Slash commands that use game data: /dungeons, /craft, /order and /character."""
 
 from __future__ import annotations
 
@@ -9,7 +9,15 @@ import discord
 from discord import app_commands
 
 from . import render
-from .gamedata import active_levels, find_recipes, group_faction, members_without_recipes, recipe_names, suggest_dungeons
+from .gamedata import (
+    active_levels,
+    character_name,
+    find_recipes,
+    group_faction,
+    members_without_recipes,
+    recipe_names,
+    suggest_dungeons,
+)
 
 if TYPE_CHECKING:
     from .discord_app import CaravanBot
@@ -126,6 +134,75 @@ def register_game_commands(bot: CaravanBot) -> None:
     async def order_cancel(interaction: discord.Interaction, order_id: int) -> None:
         await close(interaction, order_id, "cancelled")
 
+    character_group = app_commands.Group(name="character", description="Link your WoW characters to you")
+
+    async def character_autocomplete(_: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        names = sorted({*members(), *(c.name for c in store.characters())}, key=str.lower)
+        return [app_commands.Choice(name=n, value=n) for n in names if current.lower() in n.lower()][:25]
+
+    def may_manage(interaction: discord.Interaction) -> bool:
+        p = interaction.permissions
+        return p.manage_guild or p.administrator
+
+    @character_group.command(name="link", description="Link a WoW character to you, so its in-game RSVPs count as yours")
+    @app_commands.describe(name="Character name, e.g. Roland or Roland-Ironvale")
+    @app_commands.autocomplete(name=character_autocomplete)
+    async def character_link(interaction: discord.Interaction, name: str) -> None:
+        full = character_name(name, list(members()))
+        if full is None:
+            await interaction.response.send_message(
+                f"I can't tell which character `{name[:40]}` is. Add the realm, e.g. `Roland-Ironvale`.", ephemeral=True
+            )
+            return
+        owner = store.character_owner(full)
+        if owner is not None and owner != interaction.user.id:
+            await interaction.response.send_message(
+                f"**{full}** is linked to <@{owner}>. They can `/character unlink` it first.",
+                ephemeral=True, allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+        store.upsert_user(interaction.user.id, interaction.user.display_name)
+        store.link_character(full, interaction.user.id, _now())
+        note = "" if full in members() else "\n-# It isn't in the latest game snapshot yet; check the spelling of the realm."
+        await interaction.response.send_message(
+            f"Linked **{full}** to you. In, Late and Out in the addon's Sessions tab now count as yours.{note}",
+            ephemeral=True,
+        )
+
+    @character_group.command(name="unlink", description="Unlink a WoW character")
+    @app_commands.describe(name="Character name, e.g. Roland-Ironvale")
+    @app_commands.autocomplete(name=character_autocomplete)
+    async def character_unlink(interaction: discord.Interaction, name: str) -> None:
+        full = character_name(name, [c.name for c in store.characters()])
+        owner = store.character_owner(full) if full else None
+        if full is None or owner is None:
+            await interaction.response.send_message(f"`{name[:40]}` isn't linked to anyone.", ephemeral=True)
+            return
+        if owner != interaction.user.id and not may_manage(interaction):
+            await interaction.response.send_message(
+                f"**{full}** is linked to <@{owner}>. Only they or someone with Manage Server can unlink it.",
+                ephemeral=True, allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+        store.unlink_character(full)
+        await interaction.response.send_message(f"Unlinked **{full}**.", ephemeral=True)
+
+    @character_group.command(name="list", description="Who has linked which characters")
+    async def character_list(interaction: discord.Interaction) -> None:
+        links = store.characters()
+        if not links:
+            await interaction.response.send_message(
+                "No characters linked yet. Link yours with `/character link`.", ephemeral=True
+            )
+            return
+        names = store.display_names()
+        by_user: dict[int, list[str]] = {}
+        for c in links:
+            by_user.setdefault(c.user_id, []).append(c.name)
+        lines = [f"**{names.get(uid, uid)}**: {', '.join(chars)}" for uid, chars in by_user.items()]
+        await interaction.response.send_message("\n".join(lines)[:2000], ephemeral=True)
+
     bot.tree.add_command(dungeons)
     bot.tree.add_command(craft)
     bot.tree.add_command(order_group)
+    bot.tree.add_command(character_group)

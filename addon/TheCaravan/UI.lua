@@ -39,10 +39,13 @@ local LAYOUTS = {
 		{ label = "When", min = 112 },
 		{ label = "Session", min = 110, flex = 1.5 },
 		{ label = "Coming", min = 130, flex = 3 },
-		{ label = "Out", min = 70, flex = 1 },
+		{ label = "Out", min = 60, flex = 1 },
+		{ label = "You", min = 130, buttons = true },
 	},
 }
 Caravan.LAYOUTS = LAYOUTS
+
+local BUTTON_W, BUTTON_GAP = 40, 2
 
 -- Shorter profession names, used when the full list doesn't fit its column.
 local SHORT_PROF = {
@@ -172,15 +175,25 @@ local function memberTooltip(row)
 	GameTooltip:Show()
 end
 
+-- Names for a list of answers; a * marks a click not in Discord yet.
+local function answerNames(answers, suffix)
+	local names = {}
+	for _, a in ipairs(answers) do
+		names[#names + 1] = a.label .. (a.pending and "*" or "") .. (suffix or "")
+	end
+	return names
+end
+
 local function sessionTooltip(row)
 	local s = row.session
 	GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
 	GameTooltip:AddLine(s.title or "Caravan session", 0.79, 0.57, 0.25)
 	GameTooltip:AddLine(date("%A %d %B, %H:%M", s.start), 1, 1, 1)
 	GameTooltip:AddLine(string.format("%d minutes", s.duration or 0), 0.8, 0.8, 0.8)
-	for _, group in ipairs({ { "In", s.going }, { "Late", s.late }, { "Out", s.out } }) do
-		if type(group[2]) == "table" and #group[2] > 0 then
-			GameTooltip:AddDoubleLine(group[1], table.concat(group[2], ", "), 1, 0.82, 0, 1, 1, 1)
+	local lists = Caravan:AnswerLists(s)
+	for _, status in ipairs(Caravan.RSVP_ORDER) do
+		if #lists[status] > 0 then
+			GameTooltip:AddDoubleLine(Caravan.RSVP_LABELS[status], table.concat(answerNames(lists[status]), ", "), 1, 0.82, 0, 1, 1, 1)
 		end
 	end
 	GameTooltip:Show()
@@ -334,6 +347,23 @@ function Caravan:CreateRow(f, i)
 		fs:SetWordWrap(false)
 		row.cells[c] = fs
 	end
+	-- In / Late / Out, shown in the Sessions tab's "You" column.
+	row.buttons = {}
+	for b, status in ipairs(self.RSVP_ORDER) do
+		local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+		button:SetSize(BUTTON_W, ROW_HEIGHT - 2)
+		button:SetText(self.RSVP_LABELS[status])
+		button:SetNormalFontObject("GameFontNormalSmall")
+		button:SetHighlightFontObject("GameFontHighlightSmall")
+		button.status = status
+		button:SetScript("OnClick", function(clicked)
+			if row.session then
+				self:SetRsvp(row.session.id, clicked.status)
+			end
+		end)
+		button:Hide()
+		row.buttons[b] = button
+	end
 	row:SetScript("OnEnter", onRowEnter)
 	row:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	return row
@@ -375,6 +405,7 @@ function Caravan:ApplyColumns()
 	local widths = self:ColumnWidths(layout, f.listWidth)
 	f.columnWidths = widths
 	local x = 0
+	local buttonsAt
 	for c = 1, CELLS do
 		local col, width = layout[c], widths[c]
 		local header = f.header[c]
@@ -387,10 +418,13 @@ function Caravan:ApplyColumns()
 		else
 			header:Hide()
 		end
+		if col and col.buttons then
+			buttonsAt = x
+		end
 		for _, row in ipairs(f.rows) do
 			local cell = row.cells[c]
 			cell:ClearAllPoints()
-			if col then
+			if col and not col.buttons then
 				cell:SetPoint("LEFT", row, "LEFT", 4 + x, 0)
 				cell:SetWidth(width - 6)
 				cell:Show()
@@ -400,6 +434,17 @@ function Caravan:ApplyColumns()
 			end
 		end
 		x = x + (width or 0)
+	end
+	for _, row in ipairs(f.rows) do
+		for b, button in ipairs(row.buttons) do
+			button:ClearAllPoints()
+			if buttonsAt then
+				button:SetPoint("LEFT", row, "LEFT", 2 + buttonsAt + (b - 1) * (BUTTON_W + BUTTON_GAP), 0)
+				button:Show()
+			else
+				button:Hide()
+			end
+		end
 	end
 end
 
@@ -514,30 +559,50 @@ end
 function Caravan:FillSessions()
 	local f = self.frame
 	local sessions = self:UpcomingSessions()
+	local anyPending = false
 	self:FillRows(sessions, function(row, s)
 		row.session = s
-		local coming = {}
-		for _, n in ipairs(type(s.going) == "table" and s.going or {}) do
-			coming[#coming + 1] = n
+		local lists = self:AnswerLists(s)
+		local coming = answerNames(lists.going)
+		for _, name in ipairs(answerNames(lists.late, " (late)")) do
+			coming[#coming + 1] = name
 		end
-		for _, n in ipairs(type(s.late) == "table" and s.late or {}) do
-			coming[#coming + 1] = n .. " (late)"
-		end
-		local out = type(s.out) == "table" and s.out or {}
+		local out = answerNames(lists.out)
 		row.cells[1]:SetText(date("%a %d %b %H:%M", s.start))
 		row.cells[2]:SetText(s.title or "Caravan session")
 		row.cells[3]:SetText(#coming > 0 and table.concat(coming, ", ") or "-")
 		fitText(row.cells[4], #out > 0 and table.concat(out, ", ") or "-", tostring(#out))
+		local mine, pending = self:MyStatus(s)
+		anyPending = anyPending or pending
+		for _, button in ipairs(row.buttons) do
+			if button.status == mine then
+				button:LockHighlight()
+			else
+				button:UnlockHighlight()
+			end
+		end
 	end)
 	f.empty:SetText(#sessions == 0 and "No upcoming sessions.\nSessions from Discord come in through the sync app,\nor from a friend's addon when you group up." or "")
 	local schedule = self:Schedule()
+	local source
 	if schedule and schedule.generated_at then
 		local via = type(schedule.from) == "string" and (" via " .. (schedule.from:match("^[^-]+") or schedule.from)) or ""
-		f.footer:SetText(string.format("From Discord%s, synced %s. Schedule with /session add in Discord.",
-			via, date("%a %d %b %H:%M", schedule.generated_at)))
+		source = string.format("From Discord%s, synced %s. Schedule with /session add in Discord.",
+			via, date("%a %d %b %H:%M", schedule.generated_at))
 	else
-		f.footer:SetText("Schedule sessions in Discord with /session add.")
+		source = "Schedule sessions in Discord with /session add."
 	end
+	local hint
+	if #sessions == 0 then
+		hint = nil
+	elseif not self:IsLinked() then
+		hint = "To RSVP here, link this character in Discord: /character link " .. self.selfName
+	elseif anyPending then
+		hint = "* Not in Discord yet. " .. self:RsvpRoute()
+	else
+		hint = "In, Late and Out here count as your RSVP in Discord."
+	end
+	f.footer:SetText(hint and (source .. "\n" .. hint) or source)
 end
 
 function Caravan:UpdateWindow()

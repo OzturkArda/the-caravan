@@ -28,6 +28,7 @@ function Caravan:OnInitialize()
 	db.log = db.log or {}         -- ["Name-Realm"] = this account's characters' history (see Log.lua)
 	db.minimap = db.minimap or { angle = 200, hide = false }
 	db.window = db.window or {}   -- saved size and position of the window (UI.lua)
+	db.rsvps = db.rsvps or {}     -- ["Name-Realm"] = in-game RSVPs (see Rsvp.lua)
 	if db.reminders == nil then
 		db.reminders = true       -- in-game session reminders (Schedule.lua)
 	end
@@ -61,6 +62,7 @@ end
 function Caravan:OnEnteringWorld(_, isLogin, isReload)
 	if isLogin or isReload then
 		self:PruneLog()
+		self:PruneRsvps()
 	end
 	self:TrackInstance()
 	self:QueueUpdate(5)

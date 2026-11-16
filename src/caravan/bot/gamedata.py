@@ -24,6 +24,26 @@ def short(name: str) -> str:
     return name.split("-")[0]
 
 
+def character_name(text: str, known: list[str]) -> str | None:
+    """A typed character name as "Name-Realm", or None if it can't be told.
+
+    `known` are the snapshot's member names, whose spelling wins. Without a
+    realm, the name must match exactly one known character.
+    """
+    text = text.strip()
+    by_lower = {k.lower(): k for k in known}
+    if "-" in text:
+        if text.lower() in by_lower:
+            return by_lower[text.lower()]
+        name, _, realm = text.partition("-")
+        name, realm = name.strip(), realm.replace(" ", "")
+        if not name or not realm or " " in name or "-" in realm:
+            return None
+        return name[:1].upper() + name[1:].lower() + "-" + realm
+    matches = [k for k in known if short(k).lower() == text.lower()]
+    return matches[0] if len(matches) == 1 else None
+
+
 def active_levels(members: Members, now: int, stale_days: int = STALE_DAYS) -> dict[str, int]:
     """{name: level} for members seen in the last `stale_days` (unknown age counts as active)."""
     cutoff = now - stale_days * 86400
