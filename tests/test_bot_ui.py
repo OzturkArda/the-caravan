@@ -18,6 +18,7 @@ def test_formatting_helpers():
     assert render.ts(5) == "<t:5:F>" and render.ts(5, "R") == "<t:5:R>"
     assert render.clock(1140) == "19:00" and render.clock(1440) == "00:00"
     assert render.duration(150) == "2h30" and render.duration(120) == "2h"
+    assert render.duration(15) == "15m" and render.duration(60) == "1h"
 
 
 def test_session_embed():
@@ -44,6 +45,8 @@ def test_availability_and_suggestions_text():
     assert "No availability" in render.availability_lines([], {}, {}, "UTC")
     s = [Suggestion(datetime.fromtimestamp(1_800_000_000, timezone.utc), (10,))]
     assert "1/2: Arda" in render.suggestions_text(s, {10: "Arda"}, 2, 180)
+    assert "(2 people have set availability)" in render.suggestions_text(s, {10: "Arda"}, 2, 180)
+    assert "(1 person has set availability)" in render.suggestions_text(s, {10: "Arda"}, 1, 180)
     assert "No time works" in render.suggestions_text([], {}, 0, 180)
 
 
