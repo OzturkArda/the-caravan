@@ -34,8 +34,9 @@ def test_session_embed():
 def test_session_line_and_reminder():
     assert "2 coming" in render.session_line(SESSION, RSVPS)
     text = render.reminder_text(SESSION, RSVPS, "https://x")
-    assert "<@1>" in text and "<@2>" in text and "https://x" in text
-    assert "Nobody" in render.reminder_text(SESSION, {"going": [], "late": [], "out": []}, None)
+    assert text == "⏰ **Deadmines** starts at <t:1800000000:t> (<t:1800000000:R>) · https://x <@1> <@2>"
+    nobody = render.reminder_text(SESSION, {"going": [], "late": [], "out": []}, None)
+    assert nobody == "⏰ **Deadmines** starts at <t:1800000000:t> (<t:1800000000:R>). Nobody has RSVP'd yet."
 
 
 def test_availability_and_suggestions_text():
