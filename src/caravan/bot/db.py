@@ -75,7 +75,16 @@ CREATE TABLE IF NOT EXISTS level_alerts (
     level      INTEGER NOT NULL,
     alerted_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS characters (
+    name_key  TEXT PRIMARY KEY,      -- lower-case "name-realm"
+    name      TEXT NOT NULL,         -- "Name-Realm"
+    user_id   INTEGER NOT NULL,
+    linked_at INTEGER NOT NULL
+);
 """
+
+# A game RSVP more than this far in the future (by the bot's clock) is ignored.
+MAX_CLOCK_SKEW = 300
 
 
 @dataclass(frozen=True)
@@ -133,6 +142,18 @@ class Order:
 
 
 @dataclass(frozen=True)
+class LinkedCharacter:
+    name: str
+    user_id: int
+
+
+@dataclass(frozen=True)
+class GameRsvpResult:
+    changed_sessions: set[int]   # sessions whose card needs refreshing
+    unlinked: set[str]           # characters nobody has linked
+
+
+@dataclass(frozen=True)
 class RecapRecord:
     session_id: int
     message_id: int | None
@@ -184,6 +205,35 @@ class Store:
 
     def display_names(self) -> dict[int, str]:
         return {r["user_id"]: r["display_name"] for r in self.conn.execute("SELECT * FROM users")}
+
+    # linked characters -----------------------------------------------------
+
+    def character_owner(self, name: str) -> int | None:
+        row = self.conn.execute("SELECT user_id FROM characters WHERE name_key = ?", (name.lower(),)).fetchone()
+        return row["user_id"] if row else None
+
+    def link_character(self, name: str, user_id: int, now_ts: int) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO characters (name_key, name, user_id, linked_at) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(name_key) DO UPDATE SET name = excluded.name, user_id = excluded.user_id, "
+                "linked_at = excluded.linked_at",
+                (name.lower(), name, user_id, now_ts),
+            )
+
+    def unlink_character(self, name: str) -> bool:
+        with self.conn:
+            cur = self.conn.execute("DELETE FROM characters WHERE name_key = ?", (name.lower(),))
+        return cur.rowcount > 0
+
+    def characters(self, user_id: int | None = None) -> list[LinkedCharacter]:
+        sql = "SELECT name, user_id FROM characters"
+        args: tuple[Any, ...] = ()
+        if user_id is not None:
+            sql += " WHERE user_id = ?"
+            args = (user_id,)
+        rows = self.conn.execute(sql + " ORDER BY name_key", args)
+        return [LinkedCharacter(r["name"], r["user_id"]) for r in rows]
 
     # sessions --------------------------------------------------------------
 
@@ -268,6 +318,34 @@ class Store:
             out[r["status"]].append(Attendee(r["user_id"], r["name"]))
         return out
 
+    def apply_game_rsvps(self, entries: list[dict[str, Any]], now_ts: int) -> GameRsvpResult:
+        """Apply RSVPs clicked in the addon, as the Discord user who linked each character.
+
+        `entries` are snapshot RSVPs: {character, session_id, status, at}. An
+        entry only replaces an RSVP that was set before it (in Discord or by an
+        earlier entry), so re-uploading the same entries changes nothing.
+        Sessions that were cancelled or have ended are left alone.
+        """
+        changed: set[int] = set()
+        unlinked: set[str] = set()
+        for e in sorted(entries, key=lambda e: e["at"]):
+            owner = self.character_owner(e["character"])
+            if owner is None:
+                unlinked.add(e["character"])
+                continue
+            session = self.get_session(e["session_id"])
+            if session is None or session.cancelled or session.end_ts <= now_ts or e["at"] > now_ts + MAX_CLOCK_SKEW:
+                continue
+            row = self.conn.execute(
+                "SELECT status, updated_at FROM rsvps WHERE session_id = ? AND user_id = ?", (session.id, owner)
+            ).fetchone()
+            if row is not None and e["at"] <= row["updated_at"]:
+                continue
+            self.set_rsvp(session.id, owner, e["status"], e["at"])
+            if row is None or row["status"] != e["status"]:
+                changed.add(session.id)
+        return GameRsvpResult(changed, unlinked)
+
     # reminders -------------------------------------------------------------
 
     def due_reminders(self, now_ts: int, offsets: tuple[int, ...]) -> list[tuple[Session, list[int]]]:
@@ -346,7 +424,29 @@ class Store:
 
         `reminders` (minutes before the start) lets the addon remind at the
         same times as the bot.
+
+        `people` maps Discord user ids (as strings: they don't fit a Lua
+        number) to a display name and linked characters, and each session's
+        `rsvp` maps the same ids to a status, so the addon can show character
+        names and find its own player's answer. `going`/`late`/`out` keep the
+        display names for addons before 0.3.0. `sync` is the character whose
+        sync app sent the latest snapshot, i.e. whose /reload or logout takes
+        in-game RSVPs to Discord.
         """
+        names = self.display_names()
+        chars: dict[int, list[str]] = {}
+        for c in self.characters():
+            chars.setdefault(c.user_id, []).append(c.name)
+        people: dict[str, dict[str, Any]] = {}
+
+        def person(user_id: int) -> str:
+            key = str(user_id)
+            if key not in people:
+                people[key] = {"name": names.get(user_id, key), "chars": chars.get(user_id, [])}
+            return key
+
+        for user_id in chars:
+            person(user_id)
         sessions = []
         for s in self.upcoming_sessions(now_ts, limit=20):
             rsvps = self.rsvps(s.id)
@@ -356,8 +456,17 @@ class Store:
                 "start": s.start_ts,
                 "duration": s.duration_min,
                 **{status: [a.display_name for a in rsvps[status]] for status in rsvps},
+                "rsvp": {person(a.user_id): status for status in rsvps for a in rsvps[status]},
             })
-        return {"version": SCHEMA_VERSION, "generated_at": now_ts, "reminders": list(reminders), "sessions": sessions}
+        out: dict[str, Any] = {
+            "version": SCHEMA_VERSION, "generated_at": now_ts, "reminders": list(reminders),
+            "people": people, "sessions": sessions,
+        }
+        snap = self.latest_snapshot()
+        source = snap.payload.get("source") if snap else None
+        if isinstance(source, str):
+            out["sync"] = source
+        return out
 
     # crafting orders ---------------------------------------------------------
 

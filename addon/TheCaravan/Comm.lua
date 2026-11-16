@@ -4,6 +4,7 @@
 --   { t = "DATA", v = SCHEMA, d = memberData, sg = scheduleStamp }  -- someone's latest data
 --   { t = "REQ",  v = SCHEMA }                  -- "please send yours"
 --   { t = "SCHED", v = SCHEMA, s = schedule }   -- the session list (see Schedule.lua)
+--   { t = "RSVP", v = SCHEMA, r = db.rsvps }    -- in-game RSVPs known here (see Rsvp.lua)
 --   RREQ and RCP carry recipe lists (see Recipes.lua).
 -- Only data from players on your roster is kept.
 --
@@ -110,19 +111,60 @@ local function nameList(v)
 	return out
 end
 
+local RSVP_STATUS = { going = true, late = true, out = true }
+
+-- { [Discord user id] = status }, as in a schedule session's `rsvp`.
+local function statusMap(v)
+	if type(v) ~= "table" then
+		return nil
+	end
+	local out, n = {}, 0
+	for key, status in pairs(v) do
+		n = n + 1
+		if n > MAX_NAMES then
+			break
+		end
+		if type(key) == "string" and #key <= 24 and RSVP_STATUS[status] then
+			out[key] = status
+		end
+	end
+	return out
+end
+
+-- { [Discord user id] = { name, chars } }, as in a schedule's `people`.
+local function peopleMap(v)
+	if type(v) ~= "table" then
+		return nil
+	end
+	local out, n = {}, 0
+	for key, p in pairs(v) do
+		n = n + 1
+		if n > MAX_NAMES then
+			break
+		end
+		if type(key) == "string" and #key <= 24 and type(p) == "table" then
+			out[key] = { name = str(p.name), chars = nameList(p.chars) }
+		end
+	end
+	return out
+end
+
 -- A schedule received from another player, cut down to the fields the
 -- addon uses and to sane sizes.
 function Caravan:SanitizeSchedule(s)
 	if type(s) ~= "table" or not num(s.generated_at) or type(s.sessions) ~= "table" then
 		return nil
 	end
-	local out = { version = num(s.version) or 1, generated_at = s.generated_at, sessions = {}, reminders = {} }
+	local out = {
+		version = num(s.version) or 1, generated_at = s.generated_at, sessions = {}, reminders = {},
+		people = peopleMap(s.people), sync = str(s.sync),
+	}
 	for i = 1, math.min(#s.sessions, MAX_SESSIONS) do
 		local x = s.sessions[i]
 		if type(x) == "table" and num(x.id) and num(x.start) then
 			out.sessions[#out.sessions + 1] = {
 				id = x.id, title = str(x.title, 100), start = x.start, duration = num(x.duration),
-				going = nameList(x.going), late = nameList(x.late), out = nameList(x.out),
+				going = nameList(x.going), late = nameList(x.late), out = nameList(x.out), rsvp = statusMap(x.rsvp),
 			}
 		end
 	end
@@ -274,6 +316,7 @@ function Caravan:OnGroupChanged()
 	if newcomer then
 		self:QueueUpdate(2)
 		self:RequestData()
+		self:QueueRsvpSend()
 	end
 end
 
@@ -324,6 +367,8 @@ function Caravan:OnCommReceived(prefix, message, _, sender)
 			end
 			self:AcceptSchedule(schedule, key)
 		end
+	elseif msg.t == "RSVP" then
+		self:MergeRsvps(msg.r)
 	elseif msg.t == "REQ" then
 		self:QueueUpdate(1 + math.random() * 2)
 	elseif msg.t == "RREQ" then

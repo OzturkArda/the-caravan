@@ -1,8 +1,9 @@
 """Data formats shared by the addon, the sync app and the bot.
 
-Snapshot: the group's character data, read from the addon's SavedVariables
-and posted to the bot. Schedule: upcoming sessions and RSVPs, served by the
-bot and written into the SavedVariables file for the addon to show.
+Snapshot: the group's character data and the RSVPs clicked in the addon,
+read from the addon's SavedVariables and posted to the bot. Schedule:
+upcoming sessions and RSVPs, served by the bot and written into the
+SavedVariables file for the addon to show.
 """
 
 from __future__ import annotations
@@ -110,6 +111,39 @@ def member_from_lua(data: dict[str, Any], recipes: Any = None) -> dict[str, Any]
     }
 
 
+def _rsvp(character: Any, session_id: Any, status: Any, at: Any) -> dict[str, Any] | None:
+    if not (isinstance(character, str) and character and status in RSVP_STATUSES):
+        return None
+    if _int(session_id) is None or _int(at) is None:
+        return None
+    return {"character": character[:64], "session_id": _int(session_id), "status": status, "at": _int(at)}
+
+
+def rsvps_from_lua(v: Any) -> list[dict[str, Any]]:
+    """In-game RSVPs from db.rsvps: {["Name-Realm"] = {{id, s, ts}, ...}}."""
+    out = []
+    if isinstance(v, dict):
+        for character, entries in v.items():
+            for e in as_list(entries):
+                if isinstance(e, dict):
+                    entry = _rsvp(character, e.get("id"), e.get("s"), e.get("ts"))
+                    if entry:
+                        out.append(entry)
+    return out
+
+
+def snapshot_rsvps(snapshot: dict[str, Any], limit: int = 500) -> list[dict[str, Any]]:
+    """The valid entries of a snapshot's `rsvps` list, as uploaded."""
+    raw = snapshot.get("rsvps")
+    out = []
+    for e in raw[:limit] if isinstance(raw, list) else []:
+        if isinstance(e, dict):
+            entry = _rsvp(e.get("character"), e.get("session_id"), e.get("status"), e.get("at"))
+            if entry:
+                out.append(entry)
+    return out
+
+
 def snapshot_from_savedvariables(sv: dict[str, Any], exported_at: int) -> dict[str, Any]:
     db = sv.get(DB_VAR)
     if not isinstance(db, dict):
@@ -129,6 +163,7 @@ def snapshot_from_savedvariables(sv: dict[str, Any], exported_at: int) -> dict[s
             for name, data in members.items()
             if isinstance(name, str) and isinstance(data, dict)
         },
+        "rsvps": rsvps_from_lua(db.get("rsvps")),
     }
 
 

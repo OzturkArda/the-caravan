@@ -13,5 +13,6 @@ Log.lua
 Recipes.lua
 Comm.lua
 Schedule.lua
+Rsvp.lua
 UI.lua
 Minimap.lua

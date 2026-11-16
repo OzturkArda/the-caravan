@@ -14,10 +14,11 @@ from aiohttp import web
 from discord import app_commands
 from discord.ext import tasks
 
+from ..schema import snapshot_rsvps
 from . import render
 from .api import create_app
 from .config import Config
-from .db import Session, Store
+from .db import Session, Snapshot, Store
 from .feed import GameFeed
 from .game_commands import register_game_commands
 from .planner import suggest
@@ -133,7 +134,7 @@ class CaravanBot(discord.Client):
         self.reminder_loop.start()
         self.recap_loop.start()
         app = create_app(
-            self.store, self.config.api_token, on_snapshot=self.feed.on_snapshot,
+            self.store, self.config.api_token, on_snapshot=self.on_snapshot,
             reminders=self.config.reminder_offsets,
         )
         self._runner = web.AppRunner(app)
@@ -145,6 +146,17 @@ class CaravanBot(discord.Client):
         if self._runner is not None:
             await self._runner.cleanup()
         await super().close()
+
+    async def on_snapshot(self, snapshot: Snapshot, previous: Snapshot | None = None) -> None:
+        """A new game snapshot: apply its in-game RSVPs, then alerts and recaps."""
+        result = self.store.apply_game_rsvps(snapshot_rsvps(snapshot.payload), _now())
+        if result.unlinked:
+            log.info("in-game RSVPs from unlinked characters: %s", ", ".join(sorted(result.unlinked)))
+        for session_id in sorted(result.changed_sessions):
+            session = self.store.get_session(session_id)
+            if session is not None:
+                await self.refresh_session_message(session)
+        await self.feed.on_snapshot(snapshot, previous)
 
     def tz_for(self, user_id: int) -> str:
         return self.store.user_tz(user_id) or self.config.group_tz
