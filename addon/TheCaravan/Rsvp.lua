@@ -11,7 +11,8 @@
 --
 -- The schedule says who has linked which characters (`people`) and each
 -- session's answers by Discord user (`rsvp`). Clicks made after the schedule
--- was generated are shown on top of it, marked as not in Discord yet.
+-- was generated are shown on top of it, marked "pending" (* in the window)
+-- until they're taken to be in Discord (see SyncedUntil).
 
 local _, ns = ...
 local Caravan = ns.Caravan
@@ -73,10 +74,23 @@ function Caravan:PersonLabel(key, person)
 	return type(person.name) == "string" and person.name or key
 end
 
+-- Clicks made before this are taken to be in Discord: ones the schedule
+-- already reflects and, where the sync app runs, ones saved at the last
+-- logout or /reload (the sync app uploads within seconds).
+function Caravan:SyncedUntil()
+	local schedule = self:Schedule()
+	local stamp = schedule and tonumber(schedule.generated_at) or 0
+	if self:SyncsHere() and type(self.db.savedAt) == "number" then
+		stamp = math.max(stamp, self.db.savedAt)
+	end
+	return stamp
+end
+
 -- Everyone's answer for session `s`: { [key] = { status, label, pending } }.
 function Caravan:SessionAnswers(s)
 	local schedule = self:Schedule()
 	local stamp = schedule and tonumber(schedule.generated_at) or 0
+	local synced = self:SyncedUntil()
 	local people = schedule and type(schedule.people) == "table" and schedule.people or {}
 	local answers = {}
 	if type(s.rsvp) == "table" then
@@ -99,7 +113,7 @@ function Caravan:SessionAnswers(s)
 				local key = self:PersonFor(char) or ("char:" .. char:lower())
 				if not newest[key] or e.ts > newest[key] then
 					newest[key] = e.ts
-					answers[key] = { status = e.s, label = short(char), pending = true }
+					answers[key] = { status = e.s, label = short(char), pending = e.ts > synced }
 				end
 			end
 		end

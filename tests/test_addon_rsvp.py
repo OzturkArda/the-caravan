@@ -70,6 +70,27 @@ def test_clicking_records_the_answer_and_shows_it_as_not_synced_yet():
     assert len(to_py(a.g.TheCaravanDB.rsvps)["Roland-Ironvale"]) == 1
 
 
+def test_a_reload_where_the_sync_app_runs_clears_the_marker_but_keeps_the_answer():
+    a = Client("Roland", schedule=schedule())
+    f = sessions_tab(a)
+    click(a, "late")
+    a.W.advance(5)
+    a.fire("PLAYER_LOGOUT")  # /reload: the game saves, the sync app uploads
+    b = Client("Roland", schedule=to_py(a.g.TheCaravanSchedule), db=to_py(a.g.TheCaravanDB))
+    g = sessions_tab(b)
+    assert g.rows[1].cells[3].text == "Roland (late)"  # still the click, no longer marked
+    assert "count as your RSVP in Discord" in g.footer.text
+    assert f.rows[1].cells[3].text == "Roland* (late)"
+
+
+def test_friends_clicks_stay_marked_after_their_own_reload():
+    a = Client("Brakka", schedule={**schedule(), "from": "Roland-Ironvale"})
+    sessions_tab(a)
+    click(a, "going")
+    a.fire("PLAYER_LOGOUT")
+    assert a.g.TheCaravanFrame.rows[1].cells[3].text == "Brakka*, Roland"
+
+
 def test_a_newer_schedule_replaces_the_pending_marker():
     a = Client("Roland", schedule=schedule())
     sessions_tab(a)
