@@ -27,6 +27,7 @@ function Caravan:OnInitialize()
 	db.recipes = db.recipes or {} -- ["Name-Realm"] = known recipes (see Recipes.lua)
 	db.log = db.log or {}         -- ["Name-Realm"] = this account's characters' history (see Log.lua)
 	db.minimap = db.minimap or { angle = 200, hide = false }
+	db.window = db.window or {}   -- saved size and position of the window (UI.lua)
 	self.db = db
 	self.unlisted = {}
 	self.recipeAsked = {}

@@ -47,9 +47,53 @@ function Frame:HookScript(name, fn) self.scripts[name] = fn end
 function Frame:IsShown() return self.shown == true end
 function Frame:Show() self.shown = true end
 function Frame:Hide() self.shown = false end
-function Frame:GetWidth() return 140 end
 function Frame:GetCenter() return 0, 0 end
 function Frame:GetEffectiveScale() return 1 end
+
+-- Size, anchors and text are remembered so layout code can be checked.
+local function sized(self)
+	if self.scripts.OnSizeChanged then
+		self.scripts.OnSizeChanged(self, self.width, self.height)
+	end
+end
+function Frame:SetWidth(w) self.width = w sized(self) end
+function Frame:SetHeight(h) self.height = h sized(self) end
+function Frame:SetSize(w, h) self.width, self.height = w, h sized(self) end
+function Frame:GetWidth() return rawget(self, "width") or 140 end
+function Frame:GetHeight() return rawget(self, "height") or 20 end
+function Frame:ClearAllPoints() self.points = {} end
+function Frame:SetPoint(point, a, b, c, d)
+	self.points = rawget(self, "points") or {}
+	local rel, relPoint, x, y = a, b, c, d
+	if type(a) == "number" then -- SetPoint(point, x, y)
+		rel, relPoint, x, y = nil, point, a, b
+	elseif type(a) == "string" then -- SetPoint(point, relPoint, x, y)
+		rel, relPoint, x, y = nil, a, b, c
+	end
+	self.points[#self.points + 1] = { point, rel, relPoint or point, x or 0, y or 0 }
+end
+function Frame:GetPoint(i)
+	local p = rawget(self, "points") and self.points[i or 1]
+	if p then
+		return p[1], p[2], p[3], p[4], p[5]
+	end
+end
+function Frame:SetText(text) self.text = text end
+function Frame:GetText() return rawget(self, "text") end
+-- Roughly 6 pixels a character, ignoring colour codes.
+function Frame:GetStringWidth()
+	local plain = tostring(rawget(self, "text") or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+	return #plain * 6
+end
+function Frame:GetUnboundedStringWidth() return self:GetStringWidth() end
+-- Sizing by mouse: tests set W.dragSize = { w, h } before StopMovingOrSizing.
+function Frame:StartSizing() self.sizing = true end
+function Frame:StopMovingOrSizing()
+	if rawget(self, "sizing") and W.dragSize then
+		self:SetSize(W.dragSize[1], W.dragSize[2])
+	end
+	self.sizing = false
+end
 
 function CreateFrame(_, name)
 	local f = setmetatable({ events = {}, scripts = {} }, Frame)
@@ -68,6 +112,16 @@ DEFAULT_CHAT_FRAME = { AddMessage = function(_, msg) W.prints[#W.prints + 1] = m
 SlashCmdList = {}
 hash_SlashCmdList = {}
 RAID_CLASS_COLORS = { WARRIOR = { colorStr = "ffc69b6d" }, MAGE = { colorStr = "ff3fc7eb" } }
+
+-- FauxScrollFrame: the offset lives on the scroll frame, as in the game.
+function FauxScrollFrame_GetOffset(frame) return rawget(frame, "offset") or 0 end
+function FauxScrollFrame_Update(frame, total, visible)
+	frame.total, frame.visible = total, visible
+end
+function FauxScrollFrame_OnVerticalScroll(frame, value, rowHeight, update)
+	frame.offset = math.floor(value / rowHeight + 0.5)
+	update()
+end
 
 function W.fire(event, ...)
 	for _, f in ipairs(W.frames) do
@@ -202,7 +256,8 @@ function IsInRaid() return false end
 function GetNumGroupMembers() return #W.group > 0 and #W.group + 1 or 0 end
 
 function GetProfessions()
-	return W.profs[1] and 1 or nil, W.profs[2] and 2 or nil, nil, nil, nil
+	local function at(i) return W.profs[i] and i or nil end
+	return at(1), at(2), at(3), at(4), at(5)
 end
 function GetProfessionInfo(i)
 	local p = W.profs[i]

@@ -56,16 +56,13 @@ function Caravan:CollectGear()
 	return gear
 end
 
+-- Average item level of what's worn. The game's own average
+-- (GetAverageItemLevel) counts empty slots as zero, which reads oddly low
+-- while levelling.
 function Caravan:AverageItemLevel(gear)
-	if GetAverageItemLevel then
-		local _, equipped = GetAverageItemLevel()
-		if equipped and equipped > 0 then
-			return math.floor(equipped * 10 + 0.5) / 10
-		end
-	end
 	local total, count = 0, 0
 	for _, item in ipairs(gear) do
-		if item.il then
+		if item.il and item.il > 0 then
 			total, count = total + item.il, count + 1
 		end
 	end
