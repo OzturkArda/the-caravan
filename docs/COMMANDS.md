@@ -14,7 +14,8 @@ How to read the entries:
 - [Sessions](#sessions): [`/session add`](#session-add), [`/session list`](#session-list), [`/session cancel`](#session-cancel), [`/session suggest`](#session-suggest)
 - [Availability and timezone](#availability-and-timezone): [`/availability add`](#availability-add), [`/availability clear`](#availability-clear), [`/availability show`](#availability-show), [`/timezone set`](#timezone-set), [`/timezone show`](#timezone-show)
 - [Game data](#game-data): [`/group`](#group), [`/dungeons`](#dungeons), [`/craft`](#craft), [`/order add`](#order-add), [`/order list`](#order-list), [`/order done`](#order-done), [`/order cancel`](#order-cancel)
-- [In game: `/caravan`](#in-game-caravan): [`/caravan`](#caravan), [`add`](#caravan-add), [`addparty`](#caravan-addparty), [`remove`](#caravan-remove), [`list`](#caravan-list), [`sync`](#caravan-sync), [`minimap`](#caravan-minimap)
+- [Characters](#characters): [`/character link`](#character-link), [`/character unlink`](#character-unlink), [`/character list`](#character-list)
+- [In game: `/caravan`](#in-game-caravan): [`/caravan`](#caravan), [`add`](#caravan-add), [`addparty`](#caravan-addparty), [`remove`](#caravan-remove), [`list`](#caravan-list), [`sync`](#caravan-sync), [`minimap`](#caravan-minimap), [`reminders`](#caravan-reminders)
 
 ## Sessions
 
@@ -488,6 +489,69 @@ Withdraws an order. Only the person who placed it can cancel it.
 /order cancel order_id:7
 ```
 
+## Characters
+
+Linking tells the bot which WoW characters are yours, so the **In**, **Late** and **Out** buttons in the addon's [Sessions tab](#the-sessions-tab) count as your RSVP in Discord. Link each character you play, alts included. A character belongs to one Discord account at a time.
+
+### `/character link`
+
+Links a WoW character to you.
+
+**Syntax**
+
+```text
+/character link name:<character>
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `name` | Text, required | | `Name` or `Name-Realm`. Suggestions list the characters in the latest game snapshot. Without a realm, the name must match exactly one character there. |
+
+**Reply**: only you, e.g. "Linked **Dara-YourRealm** to you. In, Late and Out in the addon's Sessions tab now count as yours." When the character isn't in the latest snapshot yet, a note asks you to check the realm's spelling.
+
+**Errors** (only you): the name matches no character, or several, without a realm ("Add the realm, e.g. `Roland-Ironvale`"); the character is linked to someone else ("They can `/character unlink` it first").
+
+**Examples**
+
+| You type | Result |
+|---|---|
+| `/character link name:Dara` | Links Dara, if only one Dara is in the snapshot |
+| `/character link name:Dara-YourRealm` | Links Dara from YourRealm, snapshot or not |
+
+### `/character unlink`
+
+Unlinks a character. Only the player it's linked to, or someone with **Manage Server**, can unlink it.
+
+**Syntax**
+
+```text
+/character unlink name:<character>
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `name` | Text, required | | `Name` or `Name-Realm` of a linked character. |
+
+**Reply**: only you, e.g. "Unlinked **Dara-YourRealm**."
+
+**Errors** (only you): the character isn't linked; it's linked to someone else and you don't have Manage Server.
+
+### `/character list`
+
+Shows who has linked which characters.
+
+**Syntax**
+
+```text
+/character list
+```
+
+**Reply**: only you, one line per player, e.g. "**Dara**: Dara-YourRealm, Dalt-YourRealm".
+
 ## In game: `/caravan`
 
 Type these in the game's chat box. Replies appear in your chat window, and only you see them. Your list is the set of players whose data your addon accepts and shares, so each player adds the others once. A name typed without a realm gets your own realm.
@@ -496,13 +560,30 @@ Any other word after `/caravan` (e.g. `/caravan help`) prints the list of comman
 
 ### `/caravan`
 
-Opens or closes The Caravan window: your group's characters (hover a row for gear and professions) and upcoming sessions from Discord. `/caravan show` and the minimap button do the same.
+Opens or closes The Caravan window. `/caravan show` and the minimap button do the same. Drag the title to move it and the bottom-right corner to resize it; the size and position are remembered. Columns share out the width, and the list scrolls when it's longer than the window.
 
 **Syntax**
 
 ```text
 /caravan
 ```
+
+#### The Group tab
+
+Your group's characters: level with XP progress, zone, professions, item level (the average of worn gear) and when their data was last updated. Professions switch to short names when the column is too narrow for the full list. Hover a row for XP, every profession with its skill and every piece of gear.
+
+#### The Sessions tab
+
+Upcoming sessions from Discord, with who's coming and who's out. People who have [linked a character](#characters) show under that character's name. Hover a row for the full details.
+
+The **You** column has **In**, **Late** and **Out** buttons; your current answer is highlighted. A click is saved straight away and marked with `*` until Discord has it:
+
+- On the Mac that runs the sync app, Discord gets it at your next `/reload` or logout.
+- Everyone else's addon passes it on while grouped, so it reaches Discord once you've grouped with the player who runs the sync app and they `/reload` or log out.
+
+It counts only for a [linked](#character-link) character; the footer says so when yours isn't. A later click in Discord replaces it.
+
+The session list itself comes from the sync app, or from any friend's addon when you group up, whichever is newer. Changes made in Discord while you play arrive after the sync app's player restarts the game. The footer says when the list was synced and who passed it on.
 
 ### `/caravan add`
 
@@ -598,4 +679,24 @@ Shows or hides the minimap button. The setting is remembered.
 
 ```text
 /caravan minimap
+```
+
+### `/caravan reminders`
+
+Turns in-game session reminders off or on. They're on by default and the setting is remembered.
+
+A reminder comes at the same times as the bot's Discord reminders (`REMINDER_OFFSETS`, 60 and 15 minutes before by default): a line in chat, a raid-warning banner in the middle of the screen and the raid-warning sound. There's none for a session you've said you're **Out** of, and none for times that passed before you logged in; the login message ("Next session: …") covers those.
+
+**Syntax**
+
+```text
+/caravan reminders
+```
+
+**Reply**: "Session reminders off." or "Session reminders on."
+
+**Sample reminder**
+
+```text
+Deadmines run starts in 15 minutes (19:30).
 ```

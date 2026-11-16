@@ -278,17 +278,26 @@ function Caravan:CreateWindow()
 	end
 
 	-- The scroll frame only drives the scroll bar; the rows sit on the window.
-	f.list = CreateFrame("ScrollFrame", "TheCaravanFrameList", f, "FauxScrollFrameTemplate")
-	f.list:SetScript("OnVerticalScroll", function(list, offset)
-		if FauxScrollFrame_OnVerticalScroll then
-			FauxScrollFrame_OnVerticalScroll(list, offset, ROW_HEIGHT, function() self:UpdateWindow() end)
-		end
-	end)
+	-- Without the FauxScrollFrame template (it's legacy UI), the list still
+	-- scrolls with the mouse wheel, from f.offset.
+	local ok, list = pcall(CreateFrame, "ScrollFrame", "TheCaravanFrameList", f, "FauxScrollFrameTemplate")
+	f.faux = ok and FauxScrollFrame_GetOffset ~= nil and FauxScrollFrame_Update ~= nil
+		and FauxScrollFrame_OnVerticalScroll ~= nil
+	f.list = ok and list or CreateFrame("Frame", nil, f)
+	f.offset = 0
+	if f.faux then
+		f.list:SetScript("OnVerticalScroll", function(scroll, offset)
+			FauxScrollFrame_OnVerticalScroll(scroll, offset, ROW_HEIGHT, function() self:UpdateWindow() end)
+		end)
+	end
 	f:EnableMouseWheel(true)
 	f:SetScript("OnMouseWheel", function(_, delta)
-		local bar = scrollBar(f)
+		local bar = f.faux and scrollBar(f)
 		if bar then
 			bar:SetValue(bar:GetValue() - delta * ROW_HEIGHT * 3)
+		else
+			f.offset = clamp(f.offset - delta * 3, 0, f.maxOffset or 0)
+			self:UpdateWindow()
 		end
 	end)
 	f.rows = {}
@@ -452,10 +461,13 @@ function Caravan:ShowTab(tab)
 	self:CreateWindow()
 	self.tab = tab
 	local f = self.frame
-	f.list.offset = 0
-	local bar = scrollBar(f)
-	if bar then
-		bar:SetValue(0)
+	f.offset = 0
+	if f.faux then
+		f.list.offset = 0
+		local bar = scrollBar(f)
+		if bar then
+			bar:SetValue(0)
+		end
 	end
 	for name, button in pairs({ group = f.tabGroup, sessions = f.tabSessions }) do
 		if name == tab then
@@ -482,9 +494,9 @@ end
 function Caravan:FillRows(items, fill)
 	local f = self.frame
 	local visible = f.visibleRows
-	local offset = FauxScrollFrame_GetOffset and FauxScrollFrame_GetOffset(f.list) or 0
-	offset = clamp(offset, 0, math.max(0, #items - visible))
-	if FauxScrollFrame_Update then
+	f.maxOffset = math.max(0, #items - visible)
+	local offset = clamp(f.faux and FauxScrollFrame_GetOffset(f.list) or f.offset, 0, f.maxOffset)
+	if f.faux then
 		FauxScrollFrame_Update(f.list, #items, visible, ROW_HEIGHT)
 	end
 	for i, row in ipairs(f.rows) do

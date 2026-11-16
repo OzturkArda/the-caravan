@@ -95,6 +95,25 @@ def test_long_lists_scroll():
     assert a.errors == []
 
 
+def test_mouse_wheel_scrolls_without_the_faux_scroll_template():
+    a = Client("Roland")
+    a.g.FauxScrollFrame_Update = None  # a client without the legacy template's helpers
+    for i in range(30):
+        a.slash(f"add Friend{chr(97 + i)}" if i < 26 else f"add Pal{chr(97 + i - 26)}")
+    run([a], 6)
+    f = open_window(a)
+    assert not f.faux
+    first = f.rows[1].fullName
+    f.scripts.OnMouseWheel(f, -1)  # wheel down: three rows
+    assert f.offset == 3 and f.rows[1].fullName != first
+    for _ in range(20):
+        f.scripts.OnMouseWheel(f, -1)
+    assert f.offset == f.maxOffset == 31 - f.visibleRows
+    a.call("ShowTab", "group")
+    assert f.offset == 0 and f.rows[1].fullName == first
+    assert a.errors == []
+
+
 def test_sessions_tab_lists_names_out():
     now = 1794800000 + 100
     schedule = {"generated_at": now, "sessions": {1: {"title": "Raid night", "start": now + 600, "duration": 120,
