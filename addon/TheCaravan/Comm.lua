@@ -1,15 +1,24 @@
 -- Group sync over addon messages (AceComm handles splitting and throttling).
 --
 -- Messages are AceSerializer tables:
---   { t = "DATA", v = SCHEMA, d = memberData }  -- someone's latest data
+--   { t = "DATA", v = SCHEMA, d = memberData, sg = scheduleStamp }  -- someone's latest data
 --   { t = "REQ",  v = SCHEMA }                  -- "please send yours"
+--   { t = "SCHED", v = SCHEMA, s = schedule }   -- the session list (see Schedule.lua)
 --   RREQ and RCP carry recipe lists (see Recipes.lua).
 -- Only data from players on your roster is kept.
+--
+-- The session list reaches friends without the sync app like this: DATA
+-- carries `sg`, when the sender's schedule was generated (0 for none).
+-- Anyone holding a newer one answers with SCHED, and the receiver keeps it
+-- if it is still newer than its own. Addons older than 0.3.0 send no `sg`,
+-- so they are never sent a schedule they would ignore.
 
 local _, ns = ...
 local Caravan = ns.Caravan
 
 local MIN_XP_BROADCAST_GAP = 60
+local SCHEDULE_SEND_GAP = 15 -- seconds between our own SCHED messages
+local MAX_SESSIONS, MAX_NAMES = 30, 40
 
 local function str(v, limit)
 	if type(v) == "string" then
@@ -87,6 +96,47 @@ function Caravan:SanitizeMember(d)
 	return out
 end
 
+-- A list of up to MAX_NAMES strings.
+local function nameList(v)
+	local out = {}
+	if type(v) == "table" then
+		for i = 1, math.min(#v, MAX_NAMES) do
+			local n = str(v[i])
+			if n then
+				out[#out + 1] = n
+			end
+		end
+	end
+	return out
+end
+
+-- A schedule received from another player, cut down to the fields the
+-- addon uses and to sane sizes.
+function Caravan:SanitizeSchedule(s)
+	if type(s) ~= "table" or not num(s.generated_at) or type(s.sessions) ~= "table" then
+		return nil
+	end
+	local out = { version = num(s.version) or 1, generated_at = s.generated_at, sessions = {}, reminders = {} }
+	for i = 1, math.min(#s.sessions, MAX_SESSIONS) do
+		local x = s.sessions[i]
+		if type(x) == "table" and num(x.id) and num(x.start) then
+			out.sessions[#out.sessions + 1] = {
+				id = x.id, title = str(x.title, 100), start = x.start, duration = num(x.duration),
+				going = nameList(x.going), late = nameList(x.late), out = nameList(x.out),
+			}
+		end
+	end
+	if type(s.reminders) == "table" then
+		for i = 1, math.min(#s.reminders, 5) do
+			local m = num(s.reminders[i])
+			if m then
+				out.reminders[#out.reminders + 1] = m
+			end
+		end
+	end
+	return out
+end
+
 function Caravan:GroupChannel()
 	local home = LE_PARTY_CATEGORY_HOME or 1
 	local instance = LE_PARTY_CATEGORY_INSTANCE or 2
@@ -131,7 +181,39 @@ function Caravan:Broadcast()
 		return false
 	end
 	self.lastBroadcast = GetTime()
-	return self:Send({ t = "DATA", v = self.SCHEMA, d = data })
+	return self:Send({ t = "DATA", v = self.SCHEMA, d = data, sg = self:ScheduleStamp() })
+end
+
+-- Send our schedule after a short random wait, unless someone else sends the
+-- same or a newer one first (several friends may hold it).
+function Caravan:QueueScheduleSend()
+	if self.scheduleTimer or not self:Schedule() then
+		return
+	end
+	if self.lastScheduleSend and GetTime() - self.lastScheduleSend < SCHEDULE_SEND_GAP then
+		return
+	end
+	self.scheduleTimer = self:ScheduleTimer("SendSchedule", 1 + math.random() * 2)
+end
+
+function Caravan:SendSchedule()
+	self.scheduleTimer = nil
+	local schedule = self:Schedule()
+	if not schedule then
+		return
+	end
+	if not self:CanSend() then
+		self.scheduleTimer = self:ScheduleTimer("SendSchedule", 5)
+		return
+	end
+	self.lastScheduleSend = GetTime()
+	local copy = {}
+	for k, v in pairs(schedule) do
+		if k ~= "from" then
+			copy[k] = v
+		end
+	end
+	self:Send({ t = "SCHED", v = self.SCHEMA, s = copy })
 end
 
 function Caravan:RequestData()
@@ -229,6 +311,18 @@ function Caravan:OnCommReceived(prefix, message, _, sender)
 			self.db.members[key] = data
 			self:UpdateWindow()
 			self:CheckRecipes(key, data.rh)
+		end
+		if type(msg.sg) == "number" and msg.sg < self:ScheduleStamp() then
+			self:QueueScheduleSend()
+		end
+	elseif msg.t == "SCHED" then
+		local schedule = self:SanitizeSchedule(msg.s)
+		if schedule then
+			if self.scheduleTimer and schedule.generated_at >= self:ScheduleStamp() then
+				self:CancelTimer(self.scheduleTimer) -- someone else sent it already
+				self.scheduleTimer = nil
+			end
+			self:AcceptSchedule(schedule, key)
 		end
 	elseif msg.t == "REQ" then
 		self:QueueUpdate(1 + math.random() * 2)
