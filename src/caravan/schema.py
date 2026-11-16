@@ -156,6 +156,10 @@ def _canonical(value: Any) -> Any:
 
 
 def schedule_signature(schedule: Any) -> str:
-    """Identity of a schedule's content, ignoring when it was generated."""
-    sessions = schedule.get("sessions", []) if isinstance(schedule, dict) else []
-    return json.dumps(_canonical(sessions), sort_keys=True, ensure_ascii=False)
+    """Identity of a schedule's content, ignoring when it was generated and
+    which player's addon passed it on."""
+    if not isinstance(schedule, dict):
+        return "[]"
+    content = {k: v for k, v in schedule.items() if k not in ("generated_at", "from")}
+    content.setdefault("sessions", [])
+    return json.dumps(_canonical(content), sort_keys=True, ensure_ascii=False)

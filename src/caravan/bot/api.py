@@ -23,6 +23,7 @@ def create_app(
     token: str,
     on_snapshot: SnapshotHook | None = None,
     clock: Callable[[], float] = time.time,
+    reminders: tuple[int, ...] = (60, 15),
 ) -> web.Application:
     @web.middleware
     async def auth(request: web.Request, handler):
@@ -51,7 +52,7 @@ def create_app(
         return web.json_response({"stored": snap.id})
 
     async def get_schedule(_: web.Request) -> web.Response:
-        return web.json_response(store.schedule_export(int(clock())))
+        return web.json_response(store.schedule_export(int(clock()), reminders))
 
     app = web.Application(middlewares=[auth], client_max_size=2 * 1024 * 1024)
     app.add_routes([

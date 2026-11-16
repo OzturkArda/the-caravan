@@ -28,6 +28,9 @@ function Caravan:OnInitialize()
 	db.log = db.log or {}         -- ["Name-Realm"] = this account's characters' history (see Log.lua)
 	db.minimap = db.minimap or { angle = 200, hide = false }
 	db.window = db.window or {}   -- saved size and position of the window (UI.lua)
+	if db.reminders == nil then
+		db.reminders = true       -- in-game session reminders (Schedule.lua)
+	end
 	self.db = db
 	self.unlisted = {}
 	self.recipeAsked = {}
@@ -64,6 +67,7 @@ function Caravan:OnEnteringWorld(_, isLogin, isReload)
 	self:OnGroupChanged()
 	if isLogin or isReload then
 		self:ScheduleTimer("AnnounceNextSession", 10)
+		self:ScheduleReminders()
 	end
 end
 
@@ -187,6 +191,7 @@ local HELP = {
 	"/caravan list - show your friends list",
 	"/caravan sync - send your data and ask the group for theirs",
 	"/caravan minimap - show or hide the minimap button",
+	"/caravan reminders - turn session reminders on or off",
 }
 
 function Caravan:Say(text)
@@ -244,62 +249,15 @@ function Caravan:OnSlashCommand(input)
 	elseif cmd == "minimap" then
 		self.db.minimap.hide = not self.db.minimap.hide
 		self:UpdateMinimapButton()
+	elseif cmd == "reminders" then
+		self.db.reminders = self.db.reminders == false
+		self:ScheduleReminders()
+		self:Say(self.db.reminders and "Session reminders on." or "Session reminders off.")
 	else
 		for _, line in ipairs(HELP) do
 			self:Say(line)
 		end
 	end
-end
-
--- Schedule (written by the sync app while the game is closed) -------------
-
-function Caravan:UpcomingSessions()
-	local out = {}
-	local schedule = TheCaravanSchedule
-	if type(schedule) ~= "table" or type(schedule.sessions) ~= "table" then
-		return out
-	end
-	local now = time()
-	for _, s in ipairs(schedule.sessions) do
-		if type(s) == "table" and type(s.start) == "number" then
-			local finish = s.start + (tonumber(s.duration) or 180) * 60
-			if finish > now then
-				out[#out + 1] = s
-			end
-		end
-	end
-	table.sort(out, function(a, b) return a.start < b.start end)
-	return out
-end
-
-function Caravan:FormatCountdown(seconds)
-	if seconds <= 0 then
-		return "now"
-	end
-	local h = math.floor(seconds / 3600)
-	local m = math.floor((seconds % 3600) / 60)
-	if h >= 24 then
-		return string.format("in %dd %dh", math.floor(h / 24), h % 24)
-	elseif h > 0 then
-		return string.format("in %dh %dm", h, m)
-	end
-	return string.format("in %dm", m)
-end
-
-function Caravan:AnnounceNextSession()
-	local nextSession = self:UpcomingSessions()[1]
-	if not nextSession then
-		return
-	end
-	local untilStart = nextSession.start - time()
-	if untilStart > 24 * 3600 then
-		return
-	end
-	self:Say(string.format(
-		"Next session: |c%s%s|r %s (%s).",
-		self.COLOUR, nextSession.title or "Caravan session",
-		date("%a %H:%M", nextSession.start), self:FormatCountdown(untilStart)
-	))
 end
 
 function Caravan:OnZoneChanged()

@@ -57,3 +57,12 @@ async def test_schedule(setup):
                          duration_min=60, created_by=1)
     data = await (await client.get("/schedule", headers=AUTH)).json()
     assert data["generated_at"] == 1_800_000_000 and data["sessions"][0]["title"] == "Run"
+    assert data["reminders"] == [60, 15]
+
+
+async def test_schedule_carries_the_bots_reminder_times():
+    store = Store(":memory:")
+    app = create_app(store, TOKEN, clock=lambda: 1_800_000_000, reminders=(30,))
+    async with TestClient(TestServer(app)) as client:
+        data = await (await client.get("/schedule", headers=AUTH)).json()
+    assert data["reminders"] == [30]

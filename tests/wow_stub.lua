@@ -113,6 +113,14 @@ SlashCmdList = {}
 hash_SlashCmdList = {}
 RAID_CLASS_COLORS = { WARRIOR = { colorStr = "ffc69b6d" }, MAGE = { colorStr = "ff3fc7eb" } }
 
+-- On-screen warnings and sounds are recorded for tests.
+W.notices, W.sounds = {}, {}
+RaidWarningFrame = CreateFrame("Frame", "RaidWarningFrame")
+ChatTypeInfo = { RAID_WARNING = { r = 1, g = 0.28, b = 0 } }
+SOUNDKIT = { RAID_WARNING = 8959 }
+function RaidNotice_AddMessage(_, text) W.notices[#W.notices + 1] = text end
+function PlaySound(id) W.sounds[#W.sounds + 1] = id end
+
 -- FauxScrollFrame: the offset lives on the scroll frame, as in the game.
 function FauxScrollFrame_GetOffset(frame) return rawget(frame, "offset") or 0 end
 function FauxScrollFrame_Update(frame, total, visible)
