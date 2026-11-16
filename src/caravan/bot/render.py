@@ -28,6 +28,8 @@ def clock(minutes: int) -> str:
 
 def duration(minutes: int) -> str:
     h, m = divmod(minutes, 60)
+    if not h:
+        return f"{m}m"
     return f"{h}h{m:02d}" if m else f"{h}h"
 
 
@@ -76,7 +78,8 @@ def availability_lines(rules: list[Availability], names: dict[int, str], tzs: di
 def suggestions_text(suggestions: list[Suggestion], names: dict[int, str], total: int, duration_min: int) -> str:
     if not suggestions:
         return "No time works for anyone yet. Ask everyone to add availability with `/availability add`."
-    lines = [f"Best {duration(duration_min)} windows ({total} people have set availability):"]
+    who_set = "1 person has" if total == 1 else f"{total} people have"
+    lines = [f"Best {duration(duration_min)} windows ({who_set} set availability):"]
     for s in suggestions:
         epoch = int(s.start.timestamp())
         who = ", ".join(names.get(u, str(u)) for u in s.user_ids)
