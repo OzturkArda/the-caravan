@@ -48,7 +48,9 @@ fi
 if [[ "$result" == *TOKEN_SET ]]; then
   deploy/deploy-bot.sh
   echo "Recent log:"
-  ssh "$HOST" 'journalctl --user -u caravan-bot -n 12 --no-pager -o cat' || true
+  # The bot machine keeps no per-user journal: the service's lines sit in the
+  # system journal, which --user-unit reads and `--user -u` does not.
+  ssh "$HOST" 'journalctl --user-unit caravan-bot -n 12 --no-pager -o cat' || true
 else
   echo "No token in bot.env yet, so the bot wasn't started. Rerun this script with the token."
 fi
