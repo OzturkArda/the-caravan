@@ -74,7 +74,24 @@ function Caravan:OnEnteringWorld(_, isLogin, isReload)
 end
 
 -- Names -----------------------------------------------------------------
+--
+-- Players are keyed "Name-Realm". WoW Forever has no realms: names are unique
+-- across the region and carry a surname. UnitFullName returns the surname
+-- where other clients return the realm, and addon messages arrive from
+-- "Name Surname". Both become "Name-Surname", so every path gives one key.
 
+local function capitalise(s)
+	return s:sub(1, 1):upper() .. s:sub(2):lower()
+end
+
+local function join(name, second)
+	if second and second ~= "" then
+		return name .. "-" .. second
+	end
+	return name
+end
+
+-- "" on WoW Forever.
 function Caravan:RealmName()
 	local realm = GetNormalizedRealmName and GetNormalizedRealmName()
 	if not realm or realm == "" then
@@ -88,10 +105,11 @@ function Caravan:PlayerFullName()
 	if not realm or realm == "" then
 		realm = self:RealmName()
 	end
-	return name .. "-" .. realm
+	return join(name, realm)
 end
 
--- "Name" or "Name-Realm" as the client reports it -> "Name-Realm".
+-- "Name", "Name-Realm" or "Name Surname" as the client reports it
+-- -> "Name-Realm" or "Name-Surname".
 function Caravan:Normalize(name)
 	if type(name) ~= "string" then
 		return nil
@@ -101,22 +119,31 @@ function Caravan:Normalize(name)
 		return nil
 	end
 	if not name:find("-", 1, true) then
-		name = name .. "-" .. self:RealmName()
+		local first, rest = name:match("^(%S+)%s+(.+)$")
+		if first then
+			name = first .. "-" .. (rest:gsub("%s+", ""))
+		else
+			name = join(name, self:RealmName())
+		end
 	end
 	return name
 end
 
--- A name typed by the player: capitalise the character part like the game does.
+-- A name typed by the player: capitalise it like the game does (the surname
+-- too, where there are no realms).
 function Caravan:NormalizeInput(text)
 	local full = self:Normalize(text)
 	if not full then
 		return nil
 	end
-	local char, realm = full:match("^([^-]+)-(.+)$")
+	local char, second = full:match("^([^-]+)-(.+)$")
 	if not char then
-		return nil
+		return capitalise(full)
 	end
-	return char:sub(1, 1):upper() .. char:sub(2):lower() .. "-" .. realm
+	if self:RealmName() == "" then
+		second = capitalise(second)
+	end
+	return capitalise(char) .. "-" .. second
 end
 
 function Caravan:UnitFullNameNormalized(unit)
@@ -130,7 +157,7 @@ function Caravan:UnitFullNameNormalized(unit)
 	if not realm or realm == "" then
 		realm = self:RealmName()
 	end
-	return name .. "-" .. realm
+	return join(name, realm)
 end
 
 function Caravan:GroupUnits()
@@ -187,9 +214,9 @@ end
 
 local HELP = {
 	"/caravan - open or close the window",
-	"/caravan add Name[-Realm] - add a friend (no name: your target)",
+	"/caravan add Name Surname - add a friend (no name: your target)",
 	"/caravan addparty - add everyone in your group",
-	"/caravan remove Name[-Realm] - remove a friend",
+	"/caravan remove Name Surname - remove a friend",
 	"/caravan list - show your friends list",
 	"/caravan sync - send your data and ask the group for theirs",
 	"/caravan minimap - show or hide the minimap button",
@@ -213,7 +240,7 @@ function Caravan:OnSlashCommand(input)
 			name = self:UnitFullNameNormalized("target")
 		end
 		if not name then
-			self:Say("Usage: /caravan add Name[-Realm], or target a player first.")
+			self:Say("Usage: /caravan add Name Surname, or target a player first.")
 		elseif self:AddToRoster(name) then
 			self:Say(name .. " added.")
 			self:RequestData()

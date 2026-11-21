@@ -145,13 +145,13 @@ def register_game_commands(bot: CaravanBot) -> None:
         return p.manage_guild or p.administrator
 
     @character_group.command(name="link", description="Link a WoW character to you, so its in-game RSVPs count as yours")
-    @app_commands.describe(name="Character name, e.g. Roland or Roland-Ironvale")
+    @app_commands.describe(name="Character name, e.g. Roland or Roland Ironvale")
     @app_commands.autocomplete(name=character_autocomplete)
     async def character_link(interaction: discord.Interaction, name: str) -> None:
         full = character_name(name, list(members()))
         if full is None:
             await interaction.response.send_message(
-                f"I can't tell which character `{name[:40]}` is. Add the realm, e.g. `Roland-Ironvale`.", ephemeral=True
+                f"I can't tell which character `{name[:40]}` is. Add the surname, e.g. `Roland Ironvale`.", ephemeral=True
             )
             return
         owner = store.character_owner(full)
@@ -163,14 +163,14 @@ def register_game_commands(bot: CaravanBot) -> None:
             return
         store.upsert_user(interaction.user.id, interaction.user.display_name)
         store.link_character(full, interaction.user.id, _now())
-        note = "" if full in members() else "\n-# It isn't in the latest game snapshot yet; check the spelling of the realm."
+        note = "" if full in members() else "\n-# It isn't in the latest game snapshot yet; check the spelling of the surname."
         await interaction.response.send_message(
             f"Linked **{full}** to you. In, Late and Out in the addon's Sessions tab now count as yours.{note}",
             ephemeral=True,
         )
 
     @character_group.command(name="unlink", description="Unlink a WoW character")
-    @app_commands.describe(name="Character name, e.g. Roland-Ironvale")
+    @app_commands.describe(name="Character name, e.g. Roland Ironvale")
     @app_commands.autocomplete(name=character_autocomplete)
     async def character_unlink(interaction: discord.Interaction, name: str) -> None:
         full = character_name(name, [c.name for c in store.characters()])

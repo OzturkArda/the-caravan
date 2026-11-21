@@ -44,15 +44,27 @@ def to_py(value: Any) -> Any:
 
 class Client:
     def __init__(
-        self, name: str, realm: str = "Ironvale", db: Any = None, schedule: Any = None, sv_text: str | None = None
+        self,
+        name: str,
+        realm: str = "Ironvale",
+        db: Any = None,
+        schedule: Any = None,
+        sv_text: str | None = None,
+        surname: str | None = None,
     ) -> None:
         self.lua = lua51.LuaRuntime(unpack_returned_tuples=True)
         self.g = self.lua.globals()
         self.lua.execute(STUB.read_text())
         self.W = self.g.WOW
         self.W.player.name = name
-        self.W.realm = realm
-        self.full_name = f"{name}-{realm}"
+        self.surname = surname
+        if surname:  # WoW Forever: no realms, and messages come from "Name Surname"
+            self.W.realm = ""
+            self.W.player.surname = surname
+            self.full_name = f"{name} {surname}"
+        else:
+            self.W.realm = realm
+            self.full_name = f"{name}-{realm}"
         if db is not None:  # a Lua table from this runtime, or plain Python data (e.g. another client's, via to_py)
             self.g.TheCaravanDB = self.lua.table_from(db, recursive=True) if isinstance(db, dict) else db
         if schedule is not None:
@@ -80,7 +92,7 @@ class Client:
     def set_group(self, *others: "Client") -> None:
         group = self.lua.table()
         for i, other in enumerate(others, 1):
-            realm = None if other.W.realm == self.W.realm else other.W.realm
+            realm = other.surname or (None if other.W.realm == self.W.realm else other.W.realm)
             group[i] = self.lua.table_from({"name": other.W.player.name, "realm": realm})
         self.W.group = group
         self.fire("GROUP_ROSTER_UPDATE")
@@ -103,8 +115,11 @@ class Client:
         return list(to_py(self.W.errors) or [])
 
 
-def run(clients: list[Client], seconds: float) -> int:
-    """Advance every client's clock, delivering group messages between them."""
+def run(clients: list[Client], seconds: float, echo: bool = False) -> int:
+    """Advance every client's clock, delivering group messages between them.
+
+    With `echo`, senders also get their own messages back, as in the game.
+    """
     delivered = 0
     for _ in range(int(seconds * 10)):
         for c in clients:
@@ -112,7 +127,7 @@ def run(clients: list[Client], seconds: float) -> int:
         for sender in clients:
             for msg in sender.take_outbox():
                 for receiver in clients:
-                    if receiver is not sender:
+                    if echo or receiver is not sender:
                         receiver.fire("CHAT_MSG_ADDON", msg.prefix, msg.text, msg.channel, sender.full_name)
                         delivered += 1
     return delivered

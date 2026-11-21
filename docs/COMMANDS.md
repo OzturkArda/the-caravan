@@ -507,18 +507,18 @@ Links a WoW character to you.
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `name` | Text, required | | `Name` or `Name-Realm`. Suggestions list the characters in the latest game snapshot. Without a realm, the name must match exactly one character there. |
+| `name` | Text, required | | `Name` or `Name Surname`, as the game shows it (`Name-Surname` works too). Suggestions list the characters in the latest game snapshot. Without a surname, the name must match exactly one character there. |
 
-**Reply**: only you, e.g. "Linked **Dara-YourRealm** to you. In, Late and Out in the addon's Sessions tab now count as yours." When the character isn't in the latest snapshot yet, a note asks you to check the realm's spelling.
+**Reply**: only you, e.g. "Linked **Dara-Brightwood** to you. In, Late and Out in the addon's Sessions tab now count as yours." When the character isn't in the latest snapshot yet, a note asks you to check the surname's spelling.
 
-**Errors** (only you): the name matches no character, or several, without a realm ("Add the realm, e.g. `Roland-Ironvale`"); the character is linked to someone else ("They can `/character unlink` it first").
+**Errors** (only you): the name matches no character, or several, without a surname ("Add the surname, e.g. `Roland Ironvale`"); the character is linked to someone else ("They can `/character unlink` it first").
 
 **Examples**
 
 | You type | Result |
 |---|---|
 | `/character link name:Dara` | Links Dara, if only one Dara is in the snapshot |
-| `/character link name:Dara-YourRealm` | Links Dara from YourRealm, snapshot or not |
+| `/character link name:Dara Brightwood` | Links Dara Brightwood, snapshot or not |
 
 ### `/character unlink`
 
@@ -534,9 +534,9 @@ Unlinks a character. Only the player it's linked to, or someone with **Manage Se
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `name` | Text, required | | `Name` or `Name-Realm` of a linked character. |
+| `name` | Text, required | | `Name` or `Name Surname` of a linked character. |
 
-**Reply**: only you, e.g. "Unlinked **Dara-YourRealm**."
+**Reply**: only you, e.g. "Unlinked **Dara-Brightwood**."
 
 **Errors** (only you): the character isn't linked; it's linked to someone else and you don't have Manage Server.
 
@@ -550,11 +550,11 @@ Shows who has linked which characters.
 /character list
 ```
 
-**Reply**: only you, one line per player, e.g. "**Dara**: Dara-YourRealm, Dalt-YourRealm".
+**Reply**: only you, one line per player, e.g. "**Dara**: Dara-Brightwood, Dalt-Brightwood".
 
 ## In game: `/caravan`
 
-Type these in the game's chat box. Replies appear in your chat window, and only you see them. Your list is the set of players whose data your addon accepts and shares, so each player adds the others once. A name typed without a realm gets your own realm.
+Type these in the game's chat box. Replies appear in your chat window, and only you see them. Your list is the set of players whose data your addon accepts and shares, so each player adds the others once. WoW Forever has no realms, so type a player's full name, first name and surname, as the game shows it above their head.
 
 Any other word after `/caravan` (e.g. `/caravan help`) prints the list of commands.
 
@@ -592,23 +592,22 @@ Adds a player to your list, and asks them for their data straight away.
 **Syntax**
 
 ```text
-/caravan add [Name[-Realm]]
+/caravan add [Name Surname]
 ```
 
 **Parameters**
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Name-Realm` | Character name | Your target | The player to add. Without a realm, your own realm is used. |
+| `Name Surname` | Character name | Your target | The player to add. `Name-Surname` works too. |
 
-**Reply**: "Dara-YourRealm added." With no name and no player targeted, it prints how to use the command.
+**Reply**: "Dara-Brightwood added." With no name and no player targeted, it prints how to use the command.
 
 **Examples**
 
 | You type | Result |
 |---|---|
-| `/caravan add Dara` | Adds Dara from your realm |
-| `/caravan add Dara-OtherRealm` | Adds Dara from OtherRealm |
+| `/caravan add Dara Brightwood` | Adds Dara Brightwood |
 | `/caravan add` (with a player targeted) | Adds your target |
 
 ### `/caravan addparty`
@@ -621,7 +620,7 @@ Adds everyone in your party or raid who isn't on your list yet. `/caravan addgro
 /caravan addparty
 ```
 
-**Reply**: "Added Brynn-YourRealm, Corwin-YourRealm." or "Nobody new to add."
+**Reply**: "Added Brynn-Ashford, Corwin-Vale." or "Nobody new to add."
 
 ### `/caravan remove`
 
@@ -630,16 +629,16 @@ Removes a player from your list and deletes their character and recipe data from
 **Syntax**
 
 ```text
-/caravan remove <Name[-Realm]>
+/caravan remove <Name Surname>
 ```
 
 **Parameters**
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `Name-Realm` | Character name, required | | The player to remove. Without a realm, your own realm is used. |
+| `Name Surname` | Character name, required | | The player to remove. `Name-Surname` works too. |
 
-**Reply**: "Dara-YourRealm removed." or "Not on your list: Dara".
+**Reply**: "Dara-Brightwood removed." or "Not on your list: Dara Brightwood".
 
 **Example**
 
@@ -657,7 +656,7 @@ Prints the players on your list.
 /caravan list
 ```
 
-**Reply**: "Friends: Brynn-YourRealm, Corwin-YourRealm, Dara-YourRealm", or a hint to use `/caravan addparty` when the list is empty.
+**Reply**: "Friends: Brynn-Ashford, Corwin-Vale, Dara-Brightwood", or a hint to use `/caravan addparty` when the list is empty.
 
 ### `/caravan sync`
 
