@@ -45,6 +45,9 @@ def test_character_name():
     assert character_name("dara-Burning Blade", known) == "Dara-BurningBlade"
     assert character_name("dara", known) is None
     assert character_name("-x", known) is None and character_name("a b-c", known) is None
+    # WoW Forever: "Name Surname", as the game shows it
+    assert character_name("Roland Ironvale", known) == "Roland-Ironvale"
+    assert character_name("sudo lock", known) == "Sudo-Lock"
 
 
 class FakeUser:
@@ -95,7 +98,7 @@ async def test_character_link_unlink_and_list():
 
     text = await run_command(bot, "link", FakeInteraction(20, "Bo"), "Brakka-Ironvale")
     assert "isn't in the latest game snapshot" in text
-    assert "Add the realm" in await run_command(bot, "link", FakeInteraction(20, "Bo"), "Nobody")
+    assert "Add the surname" in await run_command(bot, "link", FakeInteraction(20, "Bo"), "Nobody")
 
     listing = await run_command(bot, "list", FakeInteraction(30))
     assert listing.splitlines() == ["**Bo**: Brakka-Ironvale", "**Arda**: Roland-Ironvale"]

@@ -103,6 +103,44 @@ def test_name_normalisation():
     assert a.call("Normalize", "") is None
 
 
+def test_forever_name_normalisation():
+    a = Client("Roland", surname="Ironvale")
+    assert a.addon.selfName == "Roland-Ironvale"
+    assert a.call("Normalize", "Sudo Lock") == "Sudo-Lock"  # how addon message senders arrive
+    assert a.call("Normalize", "Sudo-Lock") == "Sudo-Lock"
+    assert a.call("Normalize", "Sudo") == "Sudo"  # no surname, no realm to add
+    assert a.call("NormalizeInput", "  sudo lock ") == "Sudo-Lock"
+    assert a.call("NormalizeInput", "sudo-lock") == "Sudo-Lock"
+    assert a.call("NormalizeInput", "sudo") == "Sudo"
+
+
+def test_forever_party_members_see_each_other():
+    # The live client: surnames instead of realms, senders "Name Surname", own messages echoed back.
+    a, b = Client("Roland", surname="Ironvale"), Client("Sudo", surname="Lock")
+    a.set_group(b)
+    b.set_group(a)
+    a.slash("addparty")
+    b.slash("addparty")
+    run([a, b], 20, echo=True)
+    assert to_py(a.call("RosterNames")) == ["Sudo-Lock"]
+    assert to_py(b.call("RosterNames")) == ["Roland-Ironvale"]
+    assert a.member("Sudo-Lock")["level"] == 14
+    assert b.member("Roland-Ironvale")["level"] == 14
+    assert to_py(a.addon.unlisted) == {} and to_py(b.addon.unlisted) == {}
+    assert a.errors == [] and b.errors == []
+
+
+def test_forever_friends_added_by_typed_name():
+    a, b = Client("Roland", surname="Ironvale"), Client("Sudo", surname="Lock")
+    a.set_group(b)
+    b.set_group(a)
+    a.slash("add sudo lock")
+    b.slash("add Roland Ironvale")
+    run([a, b], 20, echo=True)
+    assert a.member("Sudo-Lock")["level"] == 14
+    assert b.member("Roland-Ironvale")["level"] == 14
+
+
 def test_roster_add_remove_and_list():
     a = Client("Roland")
     a.slash("add Brakka")

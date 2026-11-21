@@ -244,7 +244,7 @@ function UnitFullName(unit)
 		return nil
 	end
 	if unit == "player" then
-		return W.player.name, W.realm
+		return W.player.name, W.player.surname or W.realm -- WoW Forever: the surname
 	end
 	return u.name, u.realm
 end

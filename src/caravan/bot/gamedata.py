@@ -28,9 +28,14 @@ def character_name(text: str, known: list[str]) -> str | None:
     """A typed character name as "Name-Realm", or None if it can't be told.
 
     `known` are the snapshot's member names, whose spelling wins. Without a
-    realm, the name must match exactly one known character.
+    realm, the name must match exactly one known character. WoW Forever names
+    are "Name Surname", which the addon keys as "Name-Surname".
     """
     text = text.strip()
+    if "-" not in text and " " in text:
+        first, _, surname = text.partition(" ")
+        surname = surname.replace(" ", "")
+        text = f"{first}-{surname[:1].upper()}{surname[1:].lower()}"
     by_lower = {k.lower(): k for k in known}
     if "-" in text:
         if text.lower() in by_lower:
